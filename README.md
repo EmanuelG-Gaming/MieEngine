@@ -27,6 +27,7 @@ to be sent in one compiler call.
 This allows the text editor (Vim, Neovim, Emacs, etc) to be decoupled from the build system/toolchain,
 but this example will use Visual Studio 2022.
 
+## On Windows:
 You have to set up the Windows SDK directory, along with the DirectX SDK directory.
 If you have Visual Studio installed with the Desktop building components for Windows,
 there's already d3d11.lib, dxgi.lib, etc. along with the headers for windows.h, d3d11.h, etc.
@@ -81,6 +82,38 @@ Compound literals are a non-standard feature in C++, but they are widely support
 MSVC from Visual Studio 2022 will use C++14 by default (`/std=C++14`), for compatibility with older projects.
 
 Another quirk is that, of course, compiler extensions are different between MSVC and GCC.
+
+## On Linux:
+Linux and UNIX operating systems will use WINE to run Windows executables.
+You can use WINE to test programs that have been cross-compiled on Linux.
+
+This is often done by using the MinGW version of GCC, which is specially-configured to compile Windows programs.
+
+You have to install WINE and the MinGW uCRT GCC compiler.
+
+On Void linux, it's
+```
+xbps-install -S wine cross-x86_64-w64-mingw32ucrt
+```
+
+On Debian, it's
+```
+apt install wine g++-mingw-w64-ucrt64 gcc-mingw-w64-ucrt64
+```
+(This installs both GCC and G++ compilers. You have to be aware that `apt install g++-mingw-w64-x86-64` is the MSVCrt version of `g++`,
+but we're installing the uCRT version instead)
+
+
+And now, to compile the executable, you have to do something like this:
+```
+x86_64-w64-mingw32ucrt-g++ src/main.cpp -ld3d11 -ldxgi -ld3dcompiler -luser32 -lgdi32 -I/usr/x86_64-w64-mingw32ucrt/include -mwindows -ggdb -static -lm
+```
+
+And then you can run the program using WINE:
+```
+wine a.exe
+```
+
 
 # Availability
 The code is available on Microslohp Github: https://github.com/EmanuelG-Gaming/MieEgine.
