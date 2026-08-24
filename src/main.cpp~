@@ -1,0 +1,184 @@
+/*
+#include <stdio.h>
+
+//#define _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+#define _UNICODE
+#include <windows.h>
+#include <d3d9.h>
+
+
+#ifndef _MEMSET 
+#define _MEMSET(ptr, val, bytes) memset(ptr, val, bytes)
+#endif
+
+LPDIRECT3D9 g_pD3D = NULL;
+LPDIRECT3DDEVICE9 g_pd3dDevice = NULL;
+
+HRESULT InitD3D(HWND hWnd) {
+    if (NULL == (g_pD3D = Direct3DCreate9(D3D_SDK_VERSION)))
+        return E_FAIL;
+
+    D3DPRESENT_PARAMETERS d3dpp;
+    _MEMSET(&d3dpp, 0, sizeof(d3dpp));
+
+
+    d3dpp.Windowed = TRUE;
+    d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    d3dpp.BackBufferFormat = D3DFMT_UNKNOWN;
+
+    if (FAILED(g_pD3D->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd,
+                                      D3DCREATE_SOFTWARE_VERTEXPROCESSING,
+                                      &d3dpp, &g_pd3dDevice))) {
+        return E_FAIL;
+    }
+    return S_OK;
+}
+
+void Render() {
+    if (NULL == g_pd3dDevice) return;
+
+    // Clear the backbuffer to a deep blue.
+    g_pd3dDevice->Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, 40, 100), 1.0f, 0);
+    
+    // Begin the scene
+    if (SUCCEEDED(g_pd3dDevice->BeginScene())) {
+        // Rendering of all 3D objects happens here.
+
+        // End the scene
+        g_pd3dDevice->EndScene();
+    }
+
+    // Present the backbuffer contents to the screen
+    g_pd3dDevice->Present(NULL, NULL, NULL, NULL);
+}
+
+LRESULT WINAPI MsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_DESTROY:
+        if (g_pd3dDevice != NULL) g_pd3dDevice->Release();
+        if (g_pD3D != NULL) g_pD3D->Release();
+        PostQuitMessage(0);
+        return 0;
+    case WM_PAINT:
+        Render();
+        ValidateRect(hWnd, NULL);
+        return 0;
+    }
+    return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
+        LPSTR cmdLine, int nCmdShow) {
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, MsgProc, 0L, 0L,
+                      hInstance, NULL, NULL, NULL, NULL, L"D3D9 Tutorial", NULL };
+    RegisterClassEx(&wc);
+
+    HWND hWnd = CreateWindow(L"D3D9 Tutorial", L"Direct3D 9 Example",
+                              WS_OVERLAPPEDWINDOW, 100, 100, 800, 600,
+                              NULL, NULL, hInstance, NULL);
+
+    if (SUCCEEDED(InitD3D(hWnd))) {
+        ShowWindow(hWnd, nCmdShow);
+        UpdateWindow(hWnd);
+
+        MSG msg;
+        ZeroMemory(&msg, sizeof(msg));
+        while (msg.message != WM_QUIT) {
+            if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            } else {
+                Render(); // Continuous rendering in the message loop
+            }
+        }
+    }
+
+    UnregisterClass(L"D3D9 Tutorial", hInstance);
+    return 0;
+}
+*/
+
+/*
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+#define _UNICODE
+#include <windows.h>
+#include <minwinbase.h>
+
+#include <d3d11.h>
+#include <d3dcompiler.h>
+#endif // _WIN32
+
+#if _MSC_VER
+#pragma comment(lib, "uuid")
+#pragma comment(lib, "dxguid")
+#pragma comment(lib, "d3dcompiler")
+#pragma comment(lib, "dxgi")
+#pragma comment(lib, "d3d11")
+#pragma comment(lib, "windowscodecs.lib")
+#endif
+*/
+
+//#include "platform/window.h"
+//#include "platform/window_win32.cpp"
+
+#include "app.h"
+#include "app.cpp"
+
+//#include "graphics/gfx.h"
+#include "graphics/gfx.cpp"
+
+#include "platform/input.h"
+#include "platform/input.cpp"
+#include "platform/window.h"
+
+// TODO: GraphicsInit/GraphicsTerminate is also responsible
+// for initializing/releasing the input system, so maybe we
+// should separate it by concerns.
+
+int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hprevinstance, PSTR pScmdline, int iCmdshow)
+{
+    // Get pointer to global window handle.
+    WINDOW* window = &windowHandle;
+    if (WindowInit(window, L"amogus", 800, 600)) {
+        fprintf(stderr, "%s: Failed to open a Window!\n", __func__);
+        return -1;
+    }
+
+    if (GraphicsInit(window)) {
+        fprintf(stderr, "%s: Failed to initialize graphics!\n", __func__);
+        return -1;
+    }
+
+    // Initialize application.
+    if (AppInit(window)) {
+        fprintf(stderr, "%s: Failed to initialize application client!\n", __func__);
+        return -1;
+    }
+
+    fprintf(stderr, "Initialized application!\n");
+
+    // Run graphics system.
+    GraphicsRun();
+
+    // Release the application.
+    AppShutdown();
+    GraphicsTerminate();
+
+    fprintf(stderr, "%s: Closed window!\n", __func__);
+
+    return 0;
+}
+
+/*
+int main()
+{
+    fprintf(stderr, "Hello from Windows on the console!\n");
+    return 0;
+}
+*/

@@ -1,0 +1,21 @@
+D3D11 Graphics programming checklist:
+[v] Create a window
+[v] Make it draw the iconic solid dark blue background
+[v] Draw a triangle
+[v] Draw two triangles to form a quad
+[] Bump it to 3D and draw a cube
+[] Refactors
+[] Make a batched renderer
+[] Refactors
+
+NOTE: DirectX uses a left-handed coordinate system compared to OpenGL,
+but HLSL still uses column-major ordering like what GLSL does.
+
+Its math library, DirectXMath, uses row-major ordering for processing,
+since that's how C and C++ lay out their data successively
+(define an array in C++ and split it in newlines into a 2D grid to see why).
+
+However, the matrix data (e.g. projection/view matrices)
+is filled out in column-major ordering,
+like what you'd see in most math textbooks,
+since you multiply vectors as columns.

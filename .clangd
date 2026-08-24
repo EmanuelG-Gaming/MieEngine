@@ -1,0 +1,8 @@
+CompileFlags:
+  Add:
+    - "--target=x86_64-w64-windows-gnu"
+    - "-I/usr/x86_64-w64-mingw32ucrt/include"
+    #- "-D_WIN32"
+    #- "-DWIN32_LEAN_AND_MEAN"
+    #- "-DUNICODE"
+    #- "-D_UNICODE"

@@ -1,0 +1,26 @@
+#ifndef PLATFORM_H_
+#define PLATFORM_H_ 1
+
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+#define _UNICODE
+#include <windows.h>
+#include <minwinbase.h>
+
+//#include <d3d11.h>
+//#include <d3dcompiler.h>
+#endif /* _WIN32 */
+
+
+#if _MSC_VER
+#pragma comment(lib, "uuid")
+#pragma comment(lib, "dxguid")
+#pragma comment(lib, "d3dcompiler")
+#pragma comment(lib, "dxgi")
+#pragma comment(lib, "d3d11")
+#pragma comment(lib, "windowscodecs.lib")
+#endif
+
+#endif /* PLATFORM_H_ */
