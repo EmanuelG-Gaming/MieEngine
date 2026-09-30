@@ -1,119 +1,56 @@
-# MieEngine
-This is a game engine that uses Direct3D 11 as the graphics library.
+# DXApplication
+A minimalist game framework/engine written in C++,
+with DirectX9 and no uCRT being used, allowing the application to have very small binary sizes.
+
+# Compilation
+Before going into how it's compiled, let me explain something: What is uCRT?
+
+uCRT ("Universal C Runtime") is an application layer developed my Microsoft.
+It's the component that allows C stdlib functions (like `malloc`, `fopen` or `printf`) to be called.
+The reason why this runtime was made is because they wanted to make applications be able to be ran on different systems.
+
+You can think of uCRT like GlibC or Musl on Linux.
 
 
-# Characteristics
-- D3D11 renderer backend
-- Custom allocators: Arena, memory pools.
-- C++11-C++14 STL maximum (e.g.`<unordered_map>` for C++11)
-- Lightweight VM runtime.
+MSVC does some weird alignment stuff with the executable, so the minimum size we can get is an 8KB file.
 
-- Minimalism:
-- C-like C++ codebase (raw C structs and functions, or C++ classes with encapsulation and no virtual functions).
-- No CMake being used. Everything gets built using one compiler command.
-Specialized tools can be used for things like asset packing.
-- No vendored libraries (GLFW, RGFW, SDL, ImGUI, etc).
-- Things implemented almost completely from scratch, only using the OS's native syscalls or the graphics library itself.
-This does require more lines of code for the application side, but you trim off the excess kebab
-that exists inside most libraries (you act as the compiler now, doing dead code elimination yourself).
+Along with vcruntime, uCRT is a 100KB component embedded in every C application you build with MSVC, or MinGW GCC compiler, by default.
+This means that it is statically-linked, which makes the executable larger.
+You can get to some pretty large executable sizes. like 100KB or 600KB or 1MB, even if you didn't do much.
 
+If you use the `/MD` compiler argument in MSVC, it will only load the dynamic library `ucrtbase.dll`,
+which drastically reduces the application's size, at the expense of more indirection for every C stdlib call.
+
+Additionally, many Win32 and experienced game developers warn you not to use the C stdlib,
+instead opting for a more "Freestanding" environment.
+This means that the programmer has to implement equivalent C standard functions themselves,
+but it also makes reverse engineering efforts easier, because it's a smaller executable binary.
 
 
-# Building
-This project has no build system like CMake or .sln files, mostly
-because it uses unity builds to get the preprocessor to
-place every header and source files into a single translation entry
-to be sent in one compiler call.
-This allows the text editor (Vim, Neovim, Emacs, etc) to be decoupled from the build system/toolchain,
-but this example will use Visual Studio 2022.
+The reason why this file is so small, is because we use dynamic linking.
+This means that the essential core libraries, like `kernel32.lib`, `libcmt.lib`, `user32.lib`, or `gdi32.lib`,
+would be loaded by the application at runtime.
+The process of DLL loading involves linking the library, creating a new memory region for the library and then loading it.
 
-## On Windows:
-You have to set up the Windows SDK directory, along with the DirectX SDK directory.
-If you have Visual Studio installed with the Desktop building components for Windows,
-there's already d3d11.lib, dxgi.lib, etc. along with the headers for windows.h, d3d11.h, etc.
+Of course, modern OSes can optimize for multiple executables that run the same libraries,
+so that the linker only has to specify the paths for the respective functions of those libraries.
 
-The developer command prompt for VS2022 automatically sets up the
-INCLUDE, LIB and PATH variables. This is done through a Batch script
-located at `C:\<Path\to\VS2022>\Common7\Tools\VsDevCmd.bat`.
-The problem with this script is that it also initializes quite some useless
-things that slow down the startup times considerably.
 
-VS2022 also no longer includes the legacy DirectX SDK.
-Instead, DirectX headers and libraries are included in the Windows SDK kit,
-which appears when you install VS2022.
-
-So the DirectX headers (d3d11.h, dxgi.h) are located in:
+# Compilation
 ```
-C:\Program files (x86)\Windows Kits\10\include\<SDK VERSION>\um\
-C:\Program files (x86)\Windows Kits\10\include\<SDK VERSION>\shared\
-```
-
-And the DirectX libraries are in:
-```
-C:\Program files (x86)\Windows Kits\10\Lib\<SDK VERSION>\um\<ARCH>\
-```
-
-So I would advise you to manually set up those aforementioned variables.
-
-You would also have to locate the uCRT includes and MSVC's C++ includes.
-MSVC has the C compatibility headers like cstdio, which maps C headers from uCRT, into equivalent C++ calls.
-
-If you're using MSVC (cl.exe), you have to use this command:
-
-```
-cl src/main.cpp /Zi /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared" /I "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt" /link user32.lib d3d11.lib d3dcompiler.lib dxgi.lib /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup /OUT:app.exe
-```
-
-Add `/DEBUG` for debug builds, and `/O2` for release builds.
-IF you want to show logs to the terminal (console mode),
-you have to replace the '/SUBSYSTEM:WINDOWS' with '/SUBSYSTEM:CONSOLE', and remove the '/ENTRY' part.
-
-Some of the quirks of the MSVC compiler, compared to things like GCC and Clang is that
-MSVC's C++ mode is probably the strictest when it comes to type casting.
-While other compilers allow for some implicit conversions (or they would only generate warnings).
-MSVC demands the programmer to be extremely explicit.
-MSVC applies the C++ standards about type compatibility in a very rigid way.
-
-Declaring Compound Literals with parentheses (like `(vec3) { x, y, z }` style from C99) doesn't work.
-It historically did not support C99 compound literals, so C++ mode generates an error.
-MSVC C mode is only supported for C89 and C99;
-Compound literals are a non-standard feature in C++, but they are widely supported by GCC and Clang as extensions.
-
-MSVC from Visual Studio 2022 will use C++14 by default (`/std=C++14`), for compatibility with older projects.
-
-Another quirk is that, of course, compiler extensions are different between MSVC and GCC.
-
-## On Linux:
-Linux and UNIX operating systems will use WINE to run Windows executables.
-You can use WINE to test programs that have been cross-compiled on Linux.
-
-This is often done by using the MinGW version of GCC, which is specially-configured to compile Windows programs.
-
-You have to install WINE and the MinGW uCRT GCC compiler.
-
-On Void linux, it's
-```
-xbps-install -S wine cross-x86_64-w64-mingw32ucrt
-```
-
-On Debian, it's
-```
-apt install wine g++-mingw-w64-ucrt64 gcc-mingw-w64-ucrt64
-```
-(This installs both GCC and G++ compilers. You have to be aware that `apt install g++-mingw-w64-x86-64` is the MSVCrt version of `g++`,
-but we're installing the uCRT version instead)
-
-
-And now, to compile the executable, you have to do something like this:
-```
-x86_64-w64-mingw32ucrt-g++ src/main.cpp -ld3d11 -ldxgi -ld3dcompiler -luser32 -lgdi32 -I/usr/x86_64-w64-mingw32ucrt/include -mwindows -ggdb -static -lm
-```
-
-And then you can run the program using WINE:
-```
-wine a.exe
+cl src/main.cpp /Zi /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared" /I "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt" /link user32.lib d3d9.lib d3dcompiler.lib dxgi.lib /SUBSYSTEM:CONSOLE /OUT:app.exe
 ```
 
 
-# Availability
-The code is available on Microslohp Github: https://github.com/EmanuelG-Gaming/MieEgine.
+```
+cl src/main.cpp /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared" /I "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt" /DRIVER:none /link /NODEFAULTLIB kernel32.lib libcmt.lib user32.lib gdi32.lib d3d9.lib d3dcompiler.lib dxgi.lib /ENTRY:customMain /OUT:app.exe
+```
+
+```
+cl src/main.cpp /ZI /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared" /I "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt" /DRIVER:none /link /NODEFAULTLIB kernel32.lib libcmt.lib user32.lib gdi32.lib d3d9.lib d3dcompiler.lib dxgi.lib /ENTRY:customMain /OUT:app.exe
+```
+
+And then you can run the application by simply doing `app.exe`.
+
+
+

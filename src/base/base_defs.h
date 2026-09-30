@@ -1,12 +1,10 @@
 #ifndef BASE_DEFS_H_
 #define BASE_DEFS_H_ 1
 
+/*
+   For platform-independent sizes.
+*/
 #include <stdint.h>
-#include <stdio.h>
-
-//#ifdef __cplusplus
-//extern "C" {
-//#endif
 
 
 /*
@@ -297,38 +295,14 @@ STATIC_ASSERT(sizeof(f64) == 8, f64_size);
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define CLAMP(v, m, M) (MAX(MIN((v), (M)), (m))) 
+#define CLAMP(v, m, M) (MAX(MIN((v), (M)), (m)))
+
 
 #define CLAMP_TOP(a, max) MIN(a, max)
 #define CLAMP_BOTTOM(a, min) MAX(a, min)
 
 #define MIN3(a, b, c) (MIN(MIN(a, b), c))
 #define MAX3(a, b, c) (MAX(MAX(a, b), c))
-
-
-// ANSI escape sequences.
-#define ANSI_ESC "\x1b"
-
-#define USE_TERM_COLOR
-#ifndef USE_TERM_COLOR
-    #define RED_FOREGROUND ""
-    #define BLUE_FOREGROUND ""
-    #define YELLOW_FOREGROUND ""
-    #define GRAY_FOREGROUND ""
-    #define DEFAULT_FOREGROUND ""
-#else
-    #define RED_FOREGROUND "\x1b[1;31m"
-    #define BLUE_FOREGROUND "\x1b[1;34m"
-    #define YELLOW_FOREGROUND "\x1b[1;33m"
-    #define GRAY_FOREGROUND "\x1b[38;5;242m"
-    #define DEFAULT_FOREGROUND "\x1b[1;39m"
-#endif // USE_TERM_COLOR
-
-// Logging.
-#define LOG_INFO(...) fprintf(stderr, BLUE_FOREGROUND"[INFO] " DEFAULT_FOREGROUND __VA_ARGS__)
-#define LOG_WARN(...) fprintf(stderr, YELLOW_FOREGROUND"[WARN] " DEFAULT_FOREGROUND __VA_ARGS__)
-#define LOG_ERROR(...) fprintf(stderr, RED_FOREGROUND"[ERROR] " DEFAULT_FOREGROUND __VA_ARGS__)
-#define LOG_DEBUG(...) fprintf(stderr, GRAY_FOREGROUND"[DEBUG]" DEFAULT_FOREGROUND __VA_ARGS__)
 
 
 /*
@@ -371,10 +345,5 @@ STATIC_ASSERT(sizeof(f64) == 8, f64_size);
                 ((n)->next->prev = (n)->prev, \
                 (n)->prev->next = (n)->next))
 
-
-
-//#ifdef __cplusplus
-//} // extern "C"
-//#endif
 
 #endif // BASE_DEFS_H_

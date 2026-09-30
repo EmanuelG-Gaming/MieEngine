@@ -1,13 +1,13 @@
 #include "camera.h"
-#include "../platform/input.h"
-#include "../platform/window.h"
+#include "../win/win.h"
+
 
 #include <string.h>
 #include <math.h>
 
 
 #define CAMERA_SPEED (0.05f)
-#define CAMERA_SENSITIVITY (0.1f)
+#define CAMERA_SENSITIVITY (0.55f)
 
 static CAMERA3CONTROLLER controller;
 

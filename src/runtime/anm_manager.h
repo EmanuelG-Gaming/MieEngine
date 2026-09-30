@@ -1,209 +1,88 @@
 #ifndef ANM_MANAGER_H_
 #define ANM_MANAGER_H_ 1
 
-#include "../base/base_defs.h"
-
-#include "../misc/arena.h"
-
-
-#define ANM_VM_HEADER_SIZE 128
-
-#define ANM_VM_CAPACITY 32
-
-// 2048 bytes.
-#define ANM_STACK_SIZE 2048
-
-#define ANM_LAYER_CAPACITY 8
-
-typedef enum Opcode {
-    DUMMY,
-    ENDL, // End parsing, return literal value
-    ENDV, // End parsing, return stack top,
-    PUSHL, // Push literal
-    PUSHV, // Push value from stack
-    POP,
-    XCHG,
-    ADD, SUB, MUL, DIV, IDIV, MOD, //IMOD,
-    AND, OR, XOR, SHL, SHR,// SAR,
-    NEG, NOT,
-    EQU, NEQ, LES, LEQ, GTR, GEQ, //BEL, ABV,
-    //AEQ,
-    JMP, JZ, JNZ,
-    CALL,
-    RET, // Return
-    RETL, // Return literal
-    RETV, // Return and push stack top
-
-    PRINTU, PRINTC, PRINT,
-
-    MAX_OPCODE,
-} Opcode;
-
-typedef enum LITERAL_TYPES {
-    INSTR_LIT_INT,
-    INSTR_LIT_CHAR,
-    INSTR_LIT_POINTER,
-    INSTR_LIT_STR,
-} LITERAL_TYPES;
-
-typedef enum VM_FLAGS {
-    VM_STATUS_HALTED = (1 << 0),
-} VM_FLAGS;
-
-typedef enum DRAW_VM_OBJ {
-    DRAW_VM_RECT,
-    DRAW_VM_ELLIPSE,
-} DRAW_VM_OBJ;
-
-
-
-typedef struct ANM_VM ANM_VM;
-typedef struct INSTR_NODE INSTR_NODE;
-
-typedef uintptr_t (*ANM_FUNCTION_SIGNATURE)(INSTR_NODE*, ANM_VM*);
-
-typedef struct INSTR_NODE {
-    Opcode op;
-
-    uintptr_t arg;
-} INSTR_NODE;
-
-
-typedef struct ANM_Segment {
-    // Real address.
-    uintptr_t begin;
-    uintptr_t offset;
-} ANM_Segment;
-
+#include "anm_vm.h"
 
 /*
-   Animation engine.
+   4096 "fast" pre-allocated VMs.
+   32 textures that can be used at once.
+
+   -> Probably the VMs have to be less dependent on heap allocations/use a more general-purpose interface for allocating memory.
 */
 
-typedef struct ANM_VM ANM_VM;
 
-typedef struct ANM_LAYER {
-    //int order;
-    struct ANM_VM* prev;
-    struct ANM_VM* next;
-} ANM_LAYER;
+class AnmManager {
+public:
+    AnmVM fastVms[4096];
+    uint8_t fastVmsAlive[4096];
+    int nextFastVmIndex;
 
-typedef struct ANM_Stack {
-    uintptr_t* sp;
-} ANM_Stack;
+    AnmVM primaryVm;
 
-typedef struct ANM_VM {
-    struct ANM_VM* current;
+    AnmVM_listNode* primaryGlobalHead;
+    AnmVM_listNode* primaryGlobalTail;
 
-    ANM_Segment* textSegment;
+    AnmVM_listNode* secondaryGlobalHead;
+    AnmVM_listNode* secondaryGlobalTail;
 
-    //ANM_LAYER layers[ANM_LAYER_CAPACITY];
-    //int nLayers;
+    AnmLoaded* loadedAnms[32];
 
-    ANM_FUNCTION_SIGNATURE** dispatchTable;
-    int nFunctions;
+    AnmVM vmLayers[31];
+    int id;
 
-    //u8* bytecode;
-    //uintptr_t stack[ANM_STACK_SIZE];
+    int allocatedVmCountMaybe;
+    int someTickCounter;
 
-    INSTR_NODE* pc;
+    AnmManager();
+    ~AnmManager();
 
-    //int codeSize;
-    //int ip;
-    //int sp;
-    ANM_Stack stack;
+    static void drawSprite2D(AnmManager* self, uint32_t layer, AnmVM* vm);
 
-    u32 flags;
-} ANM_VM;
+    static void drawVm(AnmManager* self, AnmVM* vm);
 
-/* A 'draw VM' will encapsulate state about virtual shapes. */
-typedef struct DRAW_VM {
-    DRAW_VM_OBJ geom;
+    static void addVm(AnmVM* vm, AnmID* outId);
+    static void removeVm(AnmManager* self, AnmVM* vm);
 
-    struct DRAW_VM* next;
-    int nLayers;
+    static AnmLoaded* preloadAnm(int anmSlotIndex, const char* anmFileName);
+    static int openAnmLoaded(AnmLoaded* anmLoaded, AnmHeader* anmHeader, int chunkIndex);
+    static AnmLoaded* preloadAnmFromMemory(AnmManager* self, int anmSlotIndex, const char* anmFilePath);
 
+    static void putInVmList(AnmVM* vm, AnmID* idx);
+    static void markAnmLoadedAsReleasedVmList(AnmManager* self, AnmLoaded* anmLoaded);
 
-    float color1[4];
-    float color2[4];
-} DRAW_VM;
+    static void makeVmWithAnmLoaded(AnmLoaded* anmLoaded, int scriptNumber, int anmVmLayer, AnmID* idx);
 
-//STATIC_GETSIZE(ANM_VM);
+    static void setVmPosition(AnmVM* vm, vec3* const position);
 
-typedef struct ANM_MANAGER {
-    ARENA* arena;
-
-    ANM_FUNCTION_SIGNATURE* dispatchTable;
-    int nDispatches;
-
-    ANM_VM* vms[ANM_VM_CAPACITY];
-    int vmCount;
-} ANM_MANAGER;
+    static void setInterruptById(int vmId, uint16_t pendingInterruptFlag);
+    static void setPositionById(int vmId, vec3* const position);
 
 
+    static AnmVM* allocateVm(void);
+    static AnmManager* init(AnmManager* self);
+    static AnmVM* getVmById(AnmManager* self, int anmId);
 
+    static void loadIntoAnmVm(AnmVM* vm, AnmLoaded* anmLoaded, int scriptNumber);
+    static void spawnVmAtPosition(AnmLoaded* anmLoaded, uint32_t scriptNumber, int layer, AnmID* outAnmId);
 
+    void createTextures(AnmManager* self);
+    static void releaseTextures(void);
 
-extern int ANM_Init(void);
-extern void ANM_Terminate(void);
+    void releaseAnmLoaded(AnmManager* self, AnmLoaded* anmLoaded);
 
-// Push bytecode into VM.
-//extern int ANM_Push(ANM_VM* vm, u8* bytecode, int codeSize);
+    // The update functions.
+    void renderLayer(AnmManager* self, int layer);
+    static void onTick(void* args);
 
-extern ANM_VM* ANM_CreateVM(void);
-extern int ANM_Tick(void);
+private:
+    static constexpr int N_FAST_VMS = 4096;
+    static constexpr int N_ANM_LOADEDS = 32;
 
-extern ANM_VM* VM_Init(ARENA* arena);
-extern void VM_Terminate(ANM_VM* vm);
-
-extern int VM_SetInstructions(ANM_VM* vm, INSTR_NODE* instr, int nInstr);
-
-extern uintptr_t VM_Draw(ANM_VM* vm);
-
-
-// Utility.
-extern int PrintInstructions(INSTR_NODE* instructions, LITERAL_TYPES* types, int nInstr);
-
-
-static const char* OpcodeToStr(Opcode op)
-{
-    switch (op)
+    static inline int getNextFastVmIndex(int current)
     {
-        case DUMMY: return "dummy";
-        case ENDL: return "endl";
-        case ENDV: return "endv";
-        case PUSHL: return "pushl";
-        case PUSHV: return "pushv";
-        case POP: return "pop";
-        case XCHG: return "xchg";
-        case ADD: return "add";
-        case SUB: return "sub";
-        case MUL: return "mul";
-        case DIV: return "div";
-        case IDIV: return "idiv";
-        case MOD: return "mod";
-        //case IMOD: return "imod";
-        case AND: return "and";
-        case OR: return "or";
-        case LES: return "les";
-        case LEQ: return "leq";
-        case GTR: return "gtr";
-        case GEQ: return "geq";
-        case JMP: return "jmp";
-        case JZ: return "jz";
-        case JNZ: return "jnz";
-        case CALL: return "call";
-        case RET: return "ret";
-        case RETL: return "retl";
-        case RETV: return "retv";
-
-        case PRINTU: return "printu";
-        case PRINTC: return "printc";
-        case PRINT: return "print";
-
-        case MAX_OPCODE: return "MAX OPCODE CONTROL VAR";
-        default: return "UNKNOWN";
+        return (current & (N_FAST_VMS - 1));
     }
-}
+};
+extern AnmManager* g_anmManager;
 
 #endif /* ANM_MANAGER_H_ */

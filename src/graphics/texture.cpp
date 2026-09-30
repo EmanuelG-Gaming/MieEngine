@@ -1,47 +1,78 @@
 #include "texture.h"
-#include "../base/base_defs.h"
+#include "../io/asset.h"
+#include "../base/base_log.h"
 
-extern TEXTURE* Load2x2WhitePixelSquare(void)
+// We use STB_image.
+#define STB_IMAGE_IMPLEMENTATION
+#include "image/stb_image.h"
+
+
+extern int LoadPixels(int* w, int* h, unsigned char** data, int* channels, const char* assetPath, int flags)
 {
-    static const u32 texData[4] = {
-        0xffffffff, 0xffffffff,
-        0xffffffff, 0xffffffff,
-    };
-
-    TEXTURE* result = LoadImmutableTextureFromPixels(2, 2,
-        (unsigned char *) texData, 0);
-    return result;
-}
-
-extern TEXTURE* Load2x2Checkerboard(u32 mainDiag, u32 secDiag)
-{
-    static const u32 texData[4] = {
-        mainDiag, secDiag,
-        secDiag, mainDiag,
-    };
-
-    TEXTURE* result = LoadImmutableTextureFromPixels(2, 2,
-        (unsigned char *) texData, 0);
-    return result;
-}
-
-
-extern void GetAlignedUV(
-    int tx, int ty, int blockW, int blockH, int atlasW, int atlasH, b32 flipY,
-    float* u1, float* v1, float* u2, float* v2)
-{
-    float w = (float) atlasW;
-    float h = (float) atlasH;
-
-    *u1 = (tx * blockW) / w;
-    *v1 = (ty * blockH) / h;
-    *u2 = ((tx + 1) * blockW) / w;
-    *v2 = ((ty + 1) * blockH) / h;
-
-    if (flipY)
+    //ARENA_TEMP maybe_temp = ArenaTempBegin(arena);
+    Asset* as = AssetLoad(assetPath);
+    if (as == NULL)
     {
-        *v1 = 1 - *v1;
-        *v2 = 1 - *v2;
+        LogErrorEmitF("%s: Failed to load image from disk! %s\n", __func__, assetPath);
+        return -1;
     }
+
+    int x, y, nch;
+    unsigned char* pix;
+    if (flags & TEXTURE_HI_BIT)
+    {
+        pix = reinterpret_cast<unsigned char *> (
+            stbi_load_16_from_memory(reinterpret_cast<unsigned char *>(as->data), as->size, &x, &y, &nch, *channels)
+        );
+    }
+    else
+    {
+        pix = stbi_load_from_memory(reinterpret_cast<unsigned char *>(as->data), as->size, &x, &y, &nch, *channels);
+    }
+    //ArenaTempEnd(maybe_temp);
+    if (pix == NULL)
+    {
+        LogErrorEmitF("%s: Failed to load image from memory! %s\n", __func__, assetPath);
+        return -1;
+    }
+
+
+    // Set fully transparent pixels to black.
+    if (nch == STBI_rgb_alpha)
+    {
+        for (int i = 0; i < x*y; ++i)
+        {
+            unsigned char* p = &pix[i<<2];
+            if (p[3] == 0)
+            {
+                *((u32 *) p) = 0;
+            }
+        }
+    }
+
+    AssetClose(as);
+
+    if (w) *w = x;
+    if (h) *h = y;
+    if (data) *data = pix;
+    if (channels) *channels = nch;
+
+    return 0;
+}
+
+extern GFX_texture* LoadTexture(void* args, const char* assetPath, int flags)
+{
+    unsigned char* data;
+    int w, h, nch = 4;
+    int res = LoadPixels(&w, &h, &data, &nch, assetPath, flags);
+    if (res)
+    {
+        LogErrorEmitF("%s: Failed to load texture! %s\n", __func__, assetPath);
+        return NULL;
+    }
+    GFX_texture* resultTexture = LoadImmutableTextureFromPixels(args, w, h, data, flags);
+    free(data);
+
+    return resultTexture;
 }
 

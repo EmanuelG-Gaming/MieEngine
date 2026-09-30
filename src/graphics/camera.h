@@ -2,7 +2,7 @@
 #define CAMERA_H_ 1
 
 // Different camera modes.
-#include "../base/mathf.h"
+#include "../base/math/mathf.h"
 
 typedef struct CAMERA3D {
     vec3 pos;

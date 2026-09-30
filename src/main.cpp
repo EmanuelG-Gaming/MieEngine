@@ -1,227 +1,1008 @@
-#include "app.h"
-#include "app.cpp"
+/*
+   Refer to the Advanced 3D game programming textbook with DirectX9.
+*/
 
-//#include "graphics/gfx.h"
-#include "graphics/draw3d.h"
+#include "../ext/arena.cpp"
+
+
+#include "audio/audio.h"
+#include "base/base_defs.h"
+
+#include "graphics/mesh.h"
+//#include "mem/arena.h"
+//#include "../ext/arena.cpp"
+#include "graphics/texture.h"
+#include "platform/platform.cpp"
+#include "mem/arena.cpp"
+
+#include "platform/platform.h"
+#include "win/win.h"
+#include "win/win.cpp"
+
+// Logging/strings.
+#include "base/base_string.h"
+#include "base/base_string.cpp"
+#include "base/base_log.h"
+#include "base/base_log.cpp"
+#include "base/base_fmt.h"
+#include "base/base_fmt.cpp"
+
+// Math.
+#include "base/math/mathf.h"
+#include "base/math/mathf.cpp"
+#include "base/math/base_rng.h"
+#include "base/math/base_rng.cpp"
+
+// Graphics.
+#include "graphics/draw.h"
+#include "graphics/draw.cpp"
+#include "graphics/graphics.cpp"
+
+#include "graphics/mesh.h"
+#include "graphics/mesh.cpp"
+
+#include "graphics/camera.h"
 #include "graphics/camera.cpp"
-#include "graphics/draw3d.cpp"
-#include "graphics/gfx.cpp"
-#include "graphics/model.cpp"
-#include "graphics/font.cpp"
+
+
+#include "graphics/font/font.h"
+#include "graphics/font/font.cpp"
+#include "graphics/image/image.h"
+#include "graphics/image/image.cpp"
+#include "graphics/texture.h"
 #include "graphics/texture.cpp"
 
-#include "ttf/truetype_renderer.cpp"
-#include "ttf/truetype_parse.cpp"
 
-// Memory allocation.
-#include "misc/stack.cpp"
-#include "misc/mem.cpp"
-#include "misc/arena.cpp"
+// Assets
+#include "../ext/lzss.cpp"
+#include "io/asset.h"
+#include "io/asset.cpp"
 
-#include "asset.cpp"
 
-#include "platform/input.h"
-#include "platform/input.cpp"
-#include "platform/window.h"
+// Audio.
+#include "audio/audio.h"
+#include "audio/audio.cpp"
 
-// Runtime.
+
+// ANM.
+#include "core/timer.h"
+#include "core/timer.cpp"
+#include "core/interp.h"
+#include "core/interp.cpp"
+
+#include "runtime/anm_vm.h"
+#include "runtime/anm_vars.h"
+#include "runtime/anm_vm.cpp"
+
 #include "runtime/anm_manager.h"
 #include "runtime/anm_manager.cpp"
-#include "runtime/vm_assembly.h"
-#include "runtime/vm_assembly.cpp"
-
-//#include "base/base_log.h"
 
 
-#include "base/mathf.cpp"
 
-// TODO: GraphicsInit/GraphicsTerminate is also responsible
-// for initializing/releasing the input system, so maybe we
-// should separate it by concerns.
+AnmManager* g_anmManager = NULL;
 
-int Test_Mesh(void)
+/*
+#define NOMINMAX
+#include <windows.h>
+#include <winnt.h>
+
+// Use GDI to draw text.
+
+#pragma comment(lib, "d3d9.lib")
+#pragma comment(lib, "GDI32.lib")
+*/
+
+/*
+static inline int CstrLen(const char* cstr)
 {
-    MESH mesh;
-    MeshLoad_OBJ(&mesh, "assets/utah-teapot.obj");
+    const char* ptr = cstr;
+    for (; *ptr; ++ptr) {};
+    return (int) (ptr - cstr);
+}
+
+// Only counts the logical codepoints of wchar_t.
+static inline int WstrLen(const wchar_t* cstr)
+{
+    const wchar_t* ptr = cstr;
+    for (; *ptr; ++ptr) {};
+    return (int) (ptr - cstr);
+}
+*/
+
+
+
+/*
+   Forward declarations.
+*/
+
+/*
+   Window name? Window struct?
+*/
+
+/*
+HINSTANCE hinst;
+
+static ATOM MyRegisterClass(HINSTANCE hinstance);
+static BOOL InitInstance(HINSTANCE, int);
+static LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
+static LRESULT CALLBACK About(HWND, UINT, WPARAM, LPARAM);
+*/
+
+/*
+   Defined in the linker.
+*/
+
+/*
+int APIENTRY WinMain(HINSTANCE hinstance, HINSTANCE hprevinstance, LPSTR lpcmdline, int nCmdShow);
+
+//extern "C" int __stdcall customMain()
+int main()
+{
+    return WinMain(GetModuleHandle(NULL), NULL, GetCommandLineA(), SW_SHOWDEFAULT);
+}
+*/
+
+
+
+/*
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+*/
+
+static inline float EasingNone(float t)
+{
+    return 1.0f;
+}
+static inline float EasingLinear(float t)
+{
+    return t;
+}
+static inline float EasingQuadratic(float t)
+{
+    return t*t;
+}
+static inline float EasingCubic(float t)
+{
+    return t*t*t;
+}
+
+static inline float EasingQuadratic_inOut(float t)
+{
+    if (t < 0.5f)
+    {
+        return 2.0f*t*t;
+    }
+    else
+    {
+        return -1.0f + (4.0f - 2.0f * t) * t;
+    }
+}
+
+static inline float EasingQuadratic_spike(float t)
+{
+    float off = t - 0.5f;
+    return -off*off*4 + 1;
+}
+static inline float EasingQuartic_spike(float t)
+{
+    float off = t - 0.5f;
+    static const float twoPow4 = 16;
+    return -off*off*off*off*twoPow4 + 1;
+}
+
+
+typedef struct FlashingImages {
+    GFX_texture** textures;
+    BlendMode* blends;
+
+    float timer;
+    float interpTimers[16];
+    int imageCap;
+
+    // Some linear interpolation can be used.
+    float (*easingFunc)(float);
+
+    float nextDuration;
+    b32 active;
+
+    int beginIndex;
+    int presImageCount;
+} FlashingImages;
+
+static int FlashingImagesInit(FlashingImages* res, GFX_texture** textures, BlendMode* blends, int nTex)
+{
+    res->imageCap = nTex;
+    res->textures = textures;
+    res->blends = blends;
+
+    res->timer = 0.0f;
+    _MEMSET(res->interpTimers, 0, sizeof(res->interpTimers));
+
+    res->easingFunc = EasingQuadratic_spike;
+
+    res->nextDuration = 0.5f;
+    res->active = TRUE;
+
+    res->beginIndex = 0;
+    res->presImageCount = 1;
 
     return 0;
 }
 
 
 
-int Test_Game(void)
+
+static DrawPass passes[8];
+static mat4 viewMat2D = mat4 { 1.0f };
+static mat4 viewMat3D = mat4 { 1.0f };
+
+static CAMERA3D camera3Handle { 0.0f };
+
+static FlashingImages flashingImages = { 0 };
+
+
+// TODO: Use framebuffer texture.
+void GetBillboardRotMatrix(float* mat, CAMERA3D const* camera, vec3 billboardPos)
 {
-    // Get pointer to global window handle.
-    if (DrawInit())
+    vec3 dir = (camera->pos - billboardPos).Nor();
+    vec3 right = (vec3::Cross(dir, camera->up)).Nor();
+    vec3 up = vec3::Cross(right, dir);
+
+    // Rotation matrix.
+    //float*
+    mat[0] = right.x;
+    mat[4] = right.y;
+    mat[8] = right.z;
+    mat[12] = 0.0f;
+
+    mat[1] = up.x;
+    mat[5] = up.y;
+    mat[9] = up.z;
+    mat[13] = 0.0f;
+
+    mat[2] = dir.x;
+    mat[6] = dir.y;
+    mat[10] = dir.z;
+    mat[14] = 0.0f;
+
+    mat[3] = 0.0f;
+    mat[7] = 0.0f;
+    mat[11] = 0.0f;
+    mat[15] = 1.0f;
+}
+
+GFX_texture* Load2x2PixelSquare(ARENA* arena)
+{
+    u32 pix[4] = {
+        0xffffffff, 0xffffffff,
+        0xffffffff, 0xffffffff,
+    };
+
+    return LoadImmutableTextureFromPixels(arena, 2, 2, reinterpret_cast<unsigned char *>(pix), 0);
+}
+
+
+int WindowTesting(void)
+{
+    PlatformInit();
+
+    // Begin logging things.
+    LogFrameBegin();
+
+    // More bytes neeeded.
+    ARENA* arena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
+    Window* window = WindowInit(arena, L"Testing window", 640*1.5, 480*1.5);
+
+    // Create graphics.
+    GraphicsInit(window);
+
+
+    //AudioInit(window);
+
+    AssetArchive(0, "assets.bin");
+
+    // TODO: Fix for arena.
+
+    //u8* arr = ArenaPushArrayZero(arena, u8, 6700);
+
+    // TODO: Audio playback issue (multithreading is maybe the solution).
+
+    //AUD_sound* sound = AudioLoadSound_wav(arena, "assets/csfteow.wav");
+    //AudioSoundPlay(sound);
+
+
+    GFX_texture* pixSquare = Load2x2PixelSquare(arena);
+
+    GFX_font* font = FontInit(arena);
+    FontAtlasPage* page = FontPageInit(font, 0);
+    FontLoadBitmapDefault(font, 0);
+    FontPageAdd_ascii(font, 0);
+
+    GFX_texture* fontTex = FontUploadTexture(font, 0);
+
+
+    GFX_font* font2 = FontInit(arena);
+    FontAtlasPage* page2 = FontPageInit(font2, 0);
+    FontLoadTTF(font2, 0, "assets/fonts/Exo-Bold.ttf");
+
+    GFX_texture* fontTex2 = FontUploadTexture(font2, 0);
+
+
+
+
+    /*
+    CustomVertex vertices[] = {
+        // Color is in ARGB format.
+        { 0.0f, 0.0f, 0.5f, 0, 0xffff0000, 1.0f, 0.5f },
+        { 0.5f, 1.0f, 0.5f, 0, 0xff00ff00, 0.0f, 1.0f },
+        { 1.0f, 0.0f, 0.5f, 0, 0xff0000ff, 0.0f, 0.0f },
+    };
+    */
+
+
+
+    //GFX_mesh* mesh = DrawUploadMesh(arena, vertices, 3);
+    MeshBuilder builder = MeshCreateCuboid(arena, 1, 1, 1);
+    GFX_mesh* mesh = MeshBuilderCreateMesh(&builder, arena);
+
+    GFX_texture* texture = LoadTexture(arena, "images\\code.png");
+
+    //GFX_texture* textureCube = LoadTexture(arena, "images\\lesanae.jpeg");
+    GFX_texture* zoeTexture = LoadTexture(arena, "images\\zoe.png", TEXTURE_ALPHA);
+    GFX_texture* programTexture = LoadTexture(arena, "images\\programming.png");
+    GFX_texture* perlTexture = LoadTexture(arena, "images\\perl-be-like.png");
+    GFX_texture* smallExecTexture = LoadTexture(arena, "images\\small.png");
+    GFX_texture* flareTexture = LoadTexture(arena, "images\\lensflare.png", TEXTURE_ALPHA);
+
+    // Generate some glitch image.
+    SoftImage* glitch = SoftImageInitOrigin(arena, 512, 512, 4);
+    SoftImage_generateGlitchBIOS(glitch, 0.5f);
+    GFX_texture* glitchTex = LoadImmutableTextureFromPixels(arena, glitch->width, glitch->height, glitch->data, 0);
+
+
+    // Load flashing images.
+    // Might use some procedurally-generated glitch textures.
+
+    // Sprites.
+    GFX_texture* textures[] = {
+        programTexture, fontTex, texture, fontTex2, perlTexture, smallExecTexture, glitchTex,
+    };
+    BlendMode blends[] = {
+        BLEND_ADD, BLEND_ADD, BLEND_ADD, BLEND_ADD, BLEND_ADD, BLEND_ADD, BLEND_ADD,
+    };
+
+    FlashingImagesInit(&flashingImages, textures, blends, STATIC_ARR_LEN(textures));
+    flashingImages.presImageCount = 2;
+    flashingImages.active = FALSE;
+
+
+
+    vec4 eye {0,0,-5,1};
+    vec4 center { 0,0,1,1};
+    vec4 up{0,1,0,1};
+
+    Camera3Init(&camera3Handle);
+
+    Mat4LookAt_LH(&viewMat3D, &eye, &center, &up);
+
+    // And then load our passes.
+    DrawSetPipeline(3, passes);
+
+    // 1st pass.
+    DrawSetPass2D(&passes[0]);
+    passes[0].active = TRUE;
+    passes[0].viewMatrix = &viewMat2D;
+    //passes[0].flags |= DRAW_PASS_FLAG_GAMMA;
+    DrawSetTarget();
+
+    // 2nd pass.
+    DrawSetPass3D(&passes[1]);
+    passes[1].active = TRUE;
+    passes[1].viewMatrix = &viewMat3D;
+    //passes[0].flags |= DRAW_PASS_FLAG_GAMMA;
+    DrawSetTarget();
+
+    // 3rd pass.
+    DrawSetPass3D(&passes[2]);
+    passes[2].active = TRUE;
+    passes[2].viewMatrix = &viewMat2D;
+    //passes[0].flags |= DRAW_PASS_FLAG_GAMMA;
+    DrawSetTarget();
+
+
+    /*
+       ANM logic.
+    */
+
+    g_anmManager = (AnmManager *) malloc(sizeof(AnmManager));
+    AnmVM* allocVm = AnmManager::allocateVm();
+
+    AnmVM_rawInstr instr[] = {
+        // If the bit at the varMask is 1, then it's a literal.
+        // Opcode, offset, time, varMask (MSB<-LSB), args.
+
+        // x,y,z args (quaternion axis-angle rotation)
+        { ANM_ANGLE_VEL, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(0.01f) }},
+        { ANM_DESTROY, 0, 0, 0b0000, { 0 } },
+    };
+
+    AnmVM_rawInstr parentInstr[] = {
+        //{ ANM_ROTATE, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(-0.6f) }},
+        //{ ANM_POS, ANM_NEXT, 0, 0b1111, { F32LIT(0.0f), F32LIT(-0.5f), F32LIT(0.0f) }},
+        { ANM_SCALE_GROWTH, ANM_NEXT, 0, 0b11111, { F32LIT(0.001f), F32LIT(0.001f) }},
+        { ANM_ANGLE_VEL, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(0.01f) }},
+
+        { ANM_DESTROY, 0, 0, 0b0000, { 0 } },
+    };
+
+    AnmVM vm{};
+    vm.init(&vm);
+    vm.loadScript(&vm, instr);
+
+    AnmVM parentvm{};
+    parentvm.init(&parentvm);
+    parentvm.loadScript(&parentvm, parentInstr);
+
+
+    //vm.pendingInterrupt = 0;
+
+
+    // Post the logs to a buffer that gets sent to WriteFile Windows syscall,
+    // using FastPrint() function for platform-dependent stuff.
     {
-        fprintf(stderr, "%s: Failed to initialize graphics subsystem!\n", __func__);
-        return -1;
+        String8 res = LogFrameEnd(arena, LOG_ALL, LOG_RES_CONCAT, TRUE);
+        FastPrint(res);
     }
 
-    WINDOW* window = windowHandle;
-
-    // Initialize application.
-    if (AppInit(window))
-    {
-        fprintf(stderr, "%s: Failed to initialize application client!\n", __func__);
-        return -1;
-    }
-
-
-    //fprintf(stderr, "Initialized application!\n"); 
-
-    // Run graphics system.
-    //GraphicsRun();
-    //fprintf(stderr, "%s: Sus.\n", __func__);
-
-    ANM_Init();
-
-    ANM_VM* vm = ANM_CreateVM();
-
-    float t{0};
+    u64 startedTime = 0;
+    u64 deltaTimeU = 0;
+    float t = 0.0f;
 
     while (WindowOpened(window))
     {
         startedTime = PlatformTimeUsec();
-
-        WindowProcessEvents(window);
-        if (IsKeyDown(VK_ESCAPE))
-        {
-            fprintf(stderr, "%s: alright, escaping...\n", __func__);
-            break;
-        }
 
         // BEFORE: Update camera.
         // We calculate dt.
         double dt = deltaTimeU * 0.0001f;
         Camera3Step(&camera3Handle, (float) dt);
 
-        //fprintf(stderr, "%s: DeltatimeU = %f\n", __func__, (float) deltaTimeU);
+
+        // Draw something.
+        WindowProcessEvents(window);
 
 
-        DrawClear(0x0000FF);
-        DrawReset();
-        DrawSetTarget();
-
-        ShaderUse(defaultShader);
-        DrawTexture(0, defaultSquareTexture);
-
-        DrawColor(0, 0, 0, 1.0);
-        DrawColor2(0, 0, 0, 0);
-        DrawColorMode(COLOR_LR);
-        DrawRect(2, 2);
-
-        //DrawColor(0, 0, 0, 0);
-        //DrawColor2(0, 0, 0, 0.5);
-        //DrawColorMode(COLOR_LR);
-        //DrawRect(2, 2);
-
-        /*
-        DrawMatIdentity();
-        DrawMatTranslate3D(0.3, 0.1, 0.5);
-        DrawColor(1, 1, 1, 1);
-        DrawColor2(1, 1, 0, 1);
-
-        DrawColorMode(COLOR1);
-        DrawRect(1, 1);
-        */
-
-        DrawMatIdentity();
-        DrawMatTranslate3D(-0.4, +0.5, 0.0);
-        DrawColorMode(COLOR2);
-        DrawRect(0.25, 0.5);
-
-        DrawMatIdentity();
-        DrawMatTranslate3D(-0.9, -0.5, 0.0);
-        DrawColorMode(COLOR_UD);
-        DrawColor(1, 0, 0, 1);
-        DrawColor2(1, 0, 0, 0);
-        DrawRect(0.75, 0.1);
-
-        // UI.
-        for (int i = 0; i < 10; ++i)
+        // Handle the logic of the images.
+        if (flashingImages.active)
         {
+            // Circular buffer here.
+            if (flashingImages.timer >= flashingImages.nextDuration)
+            {
+                // March over to next object.
+                flashingImages.beginIndex += 1;
+                flashingImages.timer -= flashingImages.nextDuration;
+
+            }
+
+
+            for (int i = flashingImages.beginIndex; i < flashingImages.beginIndex + flashingImages.presImageCount; ++i)
+            {
+                // Loop over index.
+                int idx = i % flashingImages.imageCap;
+
+                flashingImages.interpTimers[idx] += dt*0.01f;
+                if (flashingImages.interpTimers[idx] >= flashingImages.nextDuration)
+                {
+                    flashingImages.interpTimers[idx] -= flashingImages.nextDuration;
+                }
+            }
+
+            flashingImages.timer += dt*0.01f;
+        }
+
+        // RGB format.
+        DrawClear(0x001155);
+        //DrawClear(0xffff00);
+
+        DrawBegin();
+ 
+        if (1) {
+            // 1st pass.
+            drawState.currentPass = 0;
+            //drawState.passes[drawState.currentPass].target = 0;
+
+            DrawReset();
+            DrawSetTarget();
+
+            //DrawBlend(BLEND_ALPHA);
+
+            DrawColor(0.01, 0.01, 0.05, 1);
+            DrawColor2(0.01, 0.01, 0.05, 1);
+            DrawColorMode(COLOR_LR);
+
+            DrawTexture(0, pixSquare);
+            DrawRect(2, 2);
+
+            DrawColor(1, 1, 1, 1);
+            DrawColor2(1, 1, 1, 1);
+            DrawColorMode(COLOR_LR);
+
+            DrawTexture(0, texture);
+            DrawSkybox();
+
+
+            // Draw sectors.
+            if (0) {
+                DrawTexture(0, glitchTex);
+                DrawBlend(BLEND_ADD);
+
+                DrawColor(1, 1, 1, 0.05f);
+                DrawColor2(1, 1, 1, 0.05f);
+                DrawColorMode(COLOR_INOUT);
+
+                for (int i = 0; i < 20; ++i)
+                {
+                    DrawArcSector(8 + (i/2), i*0.1f, PI2, 0.2 + i * 0.25, 0.07f);
+                    DrawArcSector(8 + (i/2), -i*0.1f, PI2, 0.2 + i * 0.25, 0.07f);
+                }
+
+                DrawBlend(BLEND_ALPHA);
+            }
+
+            // Draw glitch texture.
+            if (0)
+            {
+                DrawBlend(BLEND_ADD);
+                DrawColor(1, 1, 1, 1);
+                DrawColor2(1, 1, 1, 1);
+                DrawColorMode(COLOR_LR);
+
+                DrawTexture(0, glitchTex);
+                DrawMatIdentity();
+                DrawRect(2, 2);
+
+                DrawBlend(BLEND_ALPHA);
+            }
+
+
+            if (0) {
+                DrawColor(1, 1, 1, 1);
+                DrawColor2(1, 1, 1, 1);
+                DrawColorMode(COLOR_LR);
+
+                DrawTexture(0, fontTex2);
+                DrawMatTranslate(0.5, 0);
+                DrawRect(0.75, 1.5);
+
+                DrawTexture(0, fontTex);
+                DrawMatTranslate(0.0, -0.5);
+                DrawRect(0.75, 1.5);
+
+                DrawColor(1, 1, 1, 0.01);
+                DrawColor2(1, 1, 1, 0.01);
+                DrawColorMode(COLOR_LR);
+            }
+
+            //DrawBlend(BLEND_ADD);
+
+            //DrawMatIdentity();
+            //DrawTexture(0, textureCube);
+            //DrawRect(2, 2);
+            //DrawBlend(BLEND_ALPHA);
+
+
+            DrawColor(1, 1, 1, 1);
+            DrawColor2(1, 1, 1, 1);
+            DrawColorMode(COLOR_LR);
+
+
+
+            // Draw from 1st font.
+            if (0) {
+                const char* text = "Holy fucking shit?!?1\n";
+                float scale = 0.005f;
+                float width = 0.0f, height = 0.0f;
+                DrawTextGetSize(font, text, 1, 0, 0, scale, &width, &height);
+                DrawTextPro(font, text, 0.3f-width*0.5f, 0.0f-height*0.5f, 1, 0.0f, 0.0f, scale, 0, NULL);
+
+                text = "IS THAT A MOTHERFUCKING BITMAP FONT REFERENCE????\n";
+                scale = 0.0035f;
+                DrawTextGetSize(font, text, 1, 0, 0, scale, &width, &height);
+                DrawTextPro(font, text, 0.3f-width*0.5f, -0.1f-height*0.5f, 1, 0.0f, 0.0f, scale, 0, NULL);
+
+                text = "BITMAP FONTS ARE THE BEST FUCKING RENDERING!!!!11 NETHACK SO BADASSS!!111\n";
+                scale = 0.0021f;
+                DrawTextGetSize(font, text, 1, 0, 0, scale, &width, &height);
+                DrawTextPro(font, text, 0.3f-width*0.5f, -0.2f-height*0.5f, 1, 0.0f, 0.0f, scale, 0, NULL);
+
+                text = "ORAORAORAORAORAORAORAORA\nMUDAMUDAMUDMAMUDAMUDAMUDAMUDA\nWRYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\n";
+                scale = 0.0021f;
+                DrawTextGetSize(font, text, 1, 0, 0, scale, &width, &height);
+                DrawTextPro(font, text, 0.3f-width*0.5f, -0.3f-height*0.5f, 1, 0.0f, 0.0f, scale, 0, NULL);
+            }
+
+            // Draw from 2nd font.
+            if (1) {
+                const char* text = "Some spinning VMs";
+                float scale = 0.002f;
+
+                DrawColor(1, 1, 1, 1);
+                DrawColor2(1, 1, 1, 1);
+                DrawColorMode(COLOR_UD);
+                DrawBlend(BLEND_ALPHA);
+
+                DrawTextPro(font2, text, -0.1, 0, 1, 0.0f, 0.0f, scale, 0, NULL);
+                /*
+                DrawColorMode(COLOR_LR);
+                DrawBlend(BLEND_ADD);
+                DrawTextPro(font2, text, -0.1, 0, 1, 0.0f, 0.0f, scale, 0, NULL);
+
+                DrawBlend(BLEND_ALPHA);
+                */
+            }
+
+
+            // Run VM.
+            DrawTexture(0, flareTexture);
+
+            {
+                // Update parent VM first.
+                parentvm.run(&parentvm);
+                parentvm.update(&parentvm);
+            }
+
+            AnmVM::run(&vm);
+            // Draw stuff as an array.
+            {
+                AnmVM::update(&vm);
+
+                float vmx = vm.entityPos.x;
+                float vmy = vm.entityPos.y;
+
+                for (int y = 0; y < 10; ++y)
+                {
+                    for (int x = 0; x < 10; ++x)
+                    {
+                        vm.entityPos.x = x / 10.0f;
+                        vm.entityPos.y = y / 10.0f;
+                        AnmVM::draw(&vm, &parentvm);
+                    }
+                }
+                vm.entityPos.x = vmx;
+                vm.entityPos.y = vmy;
+            }
+
+            DrawTexture(0, pixSquare);
+
+
+
+
+            DrawFlush();
+        }
+
+        if (1) {
+            // 2nd pass.
+            drawState.currentPass = 1;
+
+            DrawReset();
+            DrawSetTarget();
+
+            DrawColor(1, 1, 1, 1);
+            DrawColor2(1, 1, 1, 1);
+            DrawColorMode(COLOR_LR);
+
+            //DrawTexture(0, textureCube);
+            DrawTexture(0, pixSquare);
+
+            // Set up camera.
+            DrawMatIdentity();
+            //DrawMatTranslate(1, 1);
+                //DrawMatTranslate3D(sin(t)*1, 0, 5);
+            //DrawMatTranslate3D(0, 0, 5);
+
+            // Process view matrix.
+            {
+                viewMat3D = mat4::Look({ camera3Handle.pos.x, camera3Handle.pos.y, camera3Handle.pos.z, 0 }, { camera3Handle.front.x, camera3Handle.front.y, camera3Handle.front.z, 0 },  { camera3Handle.up.x, camera3Handle.up.y, camera3Handle.up.z, 0 });
+            }
+
+            //DrawSkybox();
             DrawColor(1, 1, 1, 1);
             DrawColor2(0, 0, 0, 0);
+            DrawColorMode(COLOR_UD);
+
+            // Draw her with different matrices.
+            if (0)
+            {
+                for (int x = 0; x < 50; ++x)
+                {
+                    for (int y = 0; y < 50; ++y)
+                    {
+                        DrawMatIdentity();
+                        DrawMatTranslate3D(x, 0, y);
+
+                        //DrawMatRotateYA(t);
+
+                        DrawRenderMesh(mesh);
+                    }
+                }
+            }
+            DrawColor(1, 1, 1, 1);
+            DrawColor2(1, 1, 1, 1);
+
+
+            // Draw effects.
+            if (0) {
+                //float mat[16];
+                DrawMatIdentity();
+                //GetBillboardMatrix(mat, &camera3Handle, { 10, 5, 10 });
+                float mat[16];
+                GetBillboardRotMatrix(mat, &camera3Handle, { 10, 5, 10 });
+
+                DrawSetMatrix(mat);
+                //DrawMatTranslate3D(10, 5, 10);
+
+                // Draw some ellipses.
+                DrawColorMode(COLOR_UD);
+                DrawColor(1, 0, 0, 1);
+                DrawColor2(1, 0, 0, 0);
+                DrawRect(0.75, 0.1);
+
+                for (int i = 0; i < 10; ++i)
+                {
+                    DrawColor(1, 1, 1, 1);
+                    DrawColor2(0, 0, 0, 0);
+                    DrawColorMode(COLOR_INOUT);
+                    //DrawLine(-1.0f, -1.0f, 1.0f, 1.0f, (sin(t) + 1.0f) * 0.5f);
+                    DrawEllipse(5 + i, 0.8f - i * 0.1f, 0.8f - i * 0.1f);
+                }
+            }
+
+            // Draw text.
+            if (0) {
+                DrawTexture(0, DrawGetFboTexture(FBO_TEXTURE1_COLOR));
+                DrawMatIdentity();
+                DrawMatTranslate3D(10, 10, 10);
+                DrawRectBillboard(1, 1);
+            }
+
+            DrawTexture(0, zoeTexture);
+
+            // Draw Zoe.
+            // Blue texture.
+            DrawBlend(BLEND_ADD);
+            DrawColor(0.3, 0.0, 1, 1);
+            DrawColor2(0, 0, 0, 0);
+            DrawColorMode(COLOR_UD);
+
             DrawMatIdentity();
-            DrawColorMode(COLOR_INOUT);
-            //DrawLine(-1.0f, -1.0f, 1.0f, 1.0f, (sin(t) + 1.0f) * 0.5f);
-            DrawEllipse(5 + i, 0.8f - i * 0.1f, 0.8f - i * 0.1f);
+            DrawMatTranslate3D(10, 5, 10.01);
+
+            DrawRectBillboard(1.02, 1.02);
+
+            // Red texture
+            DrawBlend(BLEND_ADD);
+            DrawColor(0.9, 0.0, 0.2, 1);
+            DrawColor2(0, 0, 0, 0);
+            DrawColorMode(COLOR_UD);
+
+            DrawMatIdentity();
+            DrawMatTranslate3D(10, 5, 10.02);
+
+            DrawRectBillboard(1, 1);
+
+            // Green texture
+            DrawBlend(BLEND_ADD);
+            DrawColor(0.2, 1, 0.2, 1);
+            DrawColor2(0, 0, 0, 0);
+            DrawColorMode(COLOR_UD);
+
+            DrawMatIdentity();
+            DrawMatTranslate3D(10, 5, 10.03);
+
+            DrawRectBillboard(1.04, 1.04);
+
+            // Draw base character.
+            DrawBlend(BLEND_ALPHA);
+            DrawColor(1, 1, 1, 0.9);
+            DrawColor2(1, 1, 1, 0.9);
+            DrawMatIdentity();
+            DrawMatTranslate3D(10, 4.99, 10);
+
+            DrawRectBillboard(0.95, 0.95);
+
+
+            DrawFlush();
         }
 
-        DrawColor(0, 1, 0, 1);
-        DrawColor2(0, 1, 0, 1);
-        DrawMatIdentity();
-        DrawMatTranslate(0.4f, 0.4f);
-        DrawColorMode(COLOR_INOUT);
-        //DrawArcSector(5, t, 5, 0.3, 0.05);
-
-        //LINEPATH path;
-        //LinePathPushStar(&path, 5, 0, 0.1, 0.1);
-
-        //DrawLinePath(path);
-        /*
-        float points[8] = {
-            0.0f, 0.0f,
-            1.0f, 1.0f,
-            0.0f, 0.5f,
-            -0.4f, 0.25f,
-        };
-        */
-
-        float points[64];
-        int p = 5;
-        LinePathCreateStar(points, 64, p, t, 0.1f, 0.2f);
-
-        DrawLinePathEx(points, p*2+1, 0.03f, LINE_PATH_CLOSED);
-
-        DrawColor(1, 0, 0, 1);
-        DrawColor2(1, 0, 0, 1);
-        DrawColorMode(COLOR_INOUT);
-
-        for (int i = 0; i < p*2; ++i)
         {
-            DrawMatIdentity();
-            DrawMatTranslate3D(points[i*2 + 0], points[i*2+1], 0);
-            DrawRect(0.03f, 0.03f);
+            drawState.currentPass = 0;
+
+            DrawReset();
+            DrawSetTarget();
+
+            if (flashingImages.active)
+            {
+                DrawMatIdentity();
+
+                // Handle drawing the flashing images.
+                for (int i = flashingImages.beginIndex; i < flashingImages.beginIndex + flashingImages.presImageCount; ++i)
+                {
+                    // Loop over index.
+                    int idx = i % flashingImages.imageCap;
+
+                    GFX_texture* tex = flashingImages.textures[idx];
+                    BlendMode blend = flashingImages.blends[idx];
+
+                    float alpha = flashingImages.easingFunc(flashingImages.interpTimers[idx]/flashingImages.nextDuration);
+
+                    float aspect = windowHandle->h / (float) windowHandle->w;
+                    //float aspect = 1.0f;
+
+                    //float width = ((tex->w / (float)windowHandle->w) / aspect)*2.0f;
+                    //float height = ((tex->h / (float) windowHandle->h) / aspect)*2.0f;
+                    float width = 2.0f;
+                    float height = 2.0f;
+
+                    DrawBlend(blend);
+                    DrawTexture(0, tex);
+
+                    DrawColor(1, 1, 1, alpha);
+                    DrawColor2(1, 1, 1, alpha);
+                    DrawColorMode(COLOR_LR);
+
+                    DrawRect(width, height);
+                }
+                DrawBlend(BLEND_ALPHA);
+            }
+
+            DrawFlush();
         }
 
-        //VM_Draw(vm);
-
-        // TODO: pro? Textures aren't being used if the draw command isn't made,
-        // which doesn't register in RenderDoc.
-        //DrawTextPro(defaultFont, "Hello", 0, 0, 40, 4.0, 0, 0.01, NULL);
-
-        DrawFlush();
-
-        // Present swapchain to the screen.
         DrawEnd();
 
-        t += dt * 0.01;
+        t += dt*0.01f;
         deltaTimeU = PlatformTimeUsec() - startedTime;
-        //if (deltaTimeU < DTIME) {
-        //    PlatformSleepMs(DTIME - deltaTimeU);
-        //}
+        //fprintf(stderr, "t:%f\n", t);
     }
 
-    // Release the application.
-    ANM_Terminate();
+    DrawMeshTerminate(mesh);
+    TextureTerminate(arena, texture);
 
-    AppShutdown();
+    FontTerminate(font);
+    FontTerminate(font2);
 
-    DrawTerminate();
+    //AudioSoundTerminate(sound);
+    //AudioTerminate();
+
+    AssetArchive(0, NULL);
+
+    GraphicsTerminate();
+    WindowTerminate(window);
+    ArenaTerminate(arena);
+
+    PlatformTerminate();
 
     return 0;
 }
 
-/*
-int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hprevinstance, PSTR pScmdline, int iCmdshow)
-{
-    return Test_Game();
-}
-*/
 
-int main(int argc, const char** argv)
+int LogTesting(void)
 {
-    return Test_Game();
+    PlatformInit();
+    ARENA* arena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
+
+    LogFrameBegin();
+
+    // Do some formatting.
+    String8 toFmt = STR8_LIT("Among us string: {u32:d}");
+
+    LogInfo("String to format:");
+    LogInfoStr(toFmt);
+    LogInfo("Result:\n");
+    Str8_format(arena, toFmt, 67);
+
+
+    {
+        String8 res = LogFrameEnd(arena, LOG_ALL, LOG_RES_CONCAT, TRUE);
+        FastPrint(res);
+    }
+
+    PlatformTerminate();
+
+    return 0;
 }
+
+int main()
+{
+    //LogTesting();
+    WindowTesting();
+    return 0;
+}
+
+/*
+ATOM MyRegisterClass(HINSTANCE hinstance)
+{
+    WNDCLASSEX w;
+    w.cbSize = sizeof(WNDCLASSEX);
+    w.style = CS_HREDRAW | CS_VREDRAW;
+    w.lpfnWndProc = (WNDPROC) WindowProc;
+    w.cbClsExtra = 0;
+    w.cbWndExtra = 0;
+    w.hInstance = hinstance;
+    w.hIcon = LoadIcon(hinstance, (LPCTSTR) IDI_APPLICATION);
+    w.hCursor = LoadCursor(NULL, IDC_ARROW);
+    w.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
+w.lpszMenuName = NULL;
+    w.lpszClassName = L"Engine Window";
+    w.hIconSm = LoadIcon(w.hInstance, (LPCTSTR) IDI_APPLICATION);
+    return RegisterClassEx(&w);
+}
+
+BOOL InitInstance(HINSTANCE hinstance, int nCmdShow)
+{
+    HWND hwnd;
+
+    hinst = hinstance;
+
+    hwnd = CreateWindow(
+        L"Engine Window",
+        L"Engine Window",
+        WS_OVERLAPPEDWINDOW,
+        20, // Starting X.
+        20, // Starting Y.
+        640, 480,
+        NULL, NULL, hinstance, NULL
+    );
+
+    if (!hwnd)
+    {
+        return FALSE;
+    }
+
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+
+    return TRUE;
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+{
+    PAINTSTRUCT ps;
+    HDC hdc;
+
+    const wchar_t* string = L"8KB application that uses GDI calls (With no uCRT)";
+
+
+    switch (message)
+    {
+        case WM_PAINT:
+        {
+            hdc = BeginPaint(hwnd, &ps);
+            // TODO: Add drawing code here...
+
+            RECT rt;
+            GetClientRect(hwnd, &rt);
+            DrawTextW(hdc, string, WstrLen(string), &rt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+            EndPaint(hwnd, &ps);
+        } break;
+
+        case WM_SIZE:
+        {
+        } break;
+
+        case WM_DESTROY:
+        {
+            PostQuitMessage(0);
+            break;
+        } break;
+
+        default:
+        {
+            return DefWindowProc(hwnd, message, wparam, lparam);
+        }
+    }
+
+    return 0;
+}
+
+*/
