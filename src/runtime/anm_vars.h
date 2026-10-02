@@ -107,6 +107,7 @@
    Registers.
 */
 
+/*
 #define ANM_I1 10000
 #define ANM_I2 10001
 #define ANM_I3 10002
@@ -124,6 +125,7 @@
 #define ANM_POSZ 10015
 
 #define ANM_FRAND 10022
+*/
 
 /*
    Instruction size.

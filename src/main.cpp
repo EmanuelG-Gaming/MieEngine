@@ -351,7 +351,7 @@ int WindowTesting(void)
     GFX_texture* programTexture = LoadTexture(arena, "images\\programming.png");
     GFX_texture* perlTexture = LoadTexture(arena, "images\\perl-be-like.png");
     GFX_texture* smallExecTexture = LoadTexture(arena, "images\\small.png");
-    GFX_texture* flareTexture = LoadTexture(arena, "images\\lensflare.png", TEXTURE_ALPHA);
+    GFX_texture* flareTexture = LoadTexture(arena, "images\\spark1.png", TEXTURE_ALPHA);
 
     // Generate some glitch image.
     SoftImage* glitch = SoftImageInitOrigin(arena, 512, 512, 4);
@@ -421,15 +421,18 @@ int WindowTesting(void)
         // Opcode, offset, time, varMask (MSB<-LSB), args.
 
         // x,y,z args (quaternion axis-angle rotation)
-        { ANM_ANGLE_VEL, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(0.01f) }},
+        //{ ANM_ANGLE_VEL, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(0.01f) }},
+        { ANM_SCALE, ANM_NEXT, 0, 0b1111, { F32LIT(0.1f), F32LIT(0.1f) } },
+        { ANM_BLENDMODE, ANM_NEXT, 0, 0b1111, { BLEND_ADD }},
+
         { ANM_DESTROY, 0, 0, 0b0000, { 0 } },
     };
 
     AnmVM_rawInstr parentInstr[] = {
         //{ ANM_ROTATE, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(-0.6f) }},
         //{ ANM_POS, ANM_NEXT, 0, 0b1111, { F32LIT(0.0f), F32LIT(-0.5f), F32LIT(0.0f) }},
-        { ANM_SCALE_GROWTH, ANM_NEXT, 0, 0b11111, { F32LIT(0.001f), F32LIT(0.001f) }},
-        { ANM_ANGLE_VEL, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(0.01f) }},
+        //{ ANM_SCALE_GROWTH, ANM_NEXT, 0, 0b11111, { F32LIT(0.01f), F32LIT(0.01f) }},
+        { ANM_ANGLE_VEL, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(0.001f) }},
 
         { ANM_DESTROY, 0, 0, 0b0000, { 0 } },
     };
@@ -595,6 +598,40 @@ int WindowTesting(void)
             DrawColorMode(COLOR_LR);
 
 
+            // Run VM.
+            DrawTexture(0, flareTexture);
+
+            {
+                // Update parent VM first.
+                parentvm.run(&parentvm);
+                parentvm.update(&parentvm);
+            }
+
+            AnmVM::run(&vm);
+            // Draw stars.
+            {
+                AnmVM::update(&vm);
+
+                float vmx = vm.entityPos.x;
+                float vmy = vm.entityPos.y;
+
+                RNG_seed(0, 2);
+                for (int i = 0; i < 1000; ++i)
+                {
+                    float randAngle = RNG_randf32_range(0, PI2);
+                    float randLength = RNG_randf32_range(0.01f, 2.0f);
+                    float c = cos(randAngle), s = sin(randAngle);
+
+                    vm.entityPos.x = c * randLength * randLength;
+                    vm.entityPos.y = s * randLength * randLength;
+
+                    AnmVM::draw(&vm, &parentvm);
+                }
+
+                vm.entityPos.x = vmx;
+                vm.entityPos.y = vmy;
+            }
+            DrawTexture(0, pixSquare);
 
             // Draw from 1st font.
             if (0) {
@@ -621,12 +658,12 @@ int WindowTesting(void)
             }
 
             // Draw from 2nd font.
-            if (1) {
+            if (0) {
                 const char* text = "Some spinning VMs";
-                float scale = 0.002f;
+                float scale = 0.0035f;
 
-                DrawColor(1, 1, 1, 1);
-                DrawColor2(1, 1, 1, 1);
+                DrawColor(0.0, 0.0, 1, 1);
+                DrawColor2(0.0, 0.0, 1, 1);
                 DrawColorMode(COLOR_UD);
                 DrawBlend(BLEND_ALPHA);
 
@@ -639,42 +676,6 @@ int WindowTesting(void)
                 DrawBlend(BLEND_ALPHA);
                 */
             }
-
-
-            // Run VM.
-            DrawTexture(0, flareTexture);
-
-            {
-                // Update parent VM first.
-                parentvm.run(&parentvm);
-                parentvm.update(&parentvm);
-            }
-
-            AnmVM::run(&vm);
-            // Draw stuff as an array.
-            {
-                AnmVM::update(&vm);
-
-                float vmx = vm.entityPos.x;
-                float vmy = vm.entityPos.y;
-
-                for (int y = 0; y < 10; ++y)
-                {
-                    for (int x = 0; x < 10; ++x)
-                    {
-                        vm.entityPos.x = x / 10.0f;
-                        vm.entityPos.y = y / 10.0f;
-                        AnmVM::draw(&vm, &parentvm);
-                    }
-                }
-                vm.entityPos.x = vmx;
-                vm.entityPos.y = vmy;
-            }
-
-            DrawTexture(0, pixSquare);
-
-
-
 
             DrawFlush();
         }

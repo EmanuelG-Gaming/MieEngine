@@ -132,13 +132,11 @@ typedef enum AnmVM_opcodes {
     ANM_LAYER = 68,
     ANM_STOPHIDE = 69,
 
-    ANM_COLORMODE = 70,
-    ANM_DRAWMODE = 71,
-    ANM_REGULAR_POLY = 72,
+    ANM_DRAWMODE = 70,
+    ANM_REGULAR_POLY = 71,
 } AnmVM_opcodes;
 
 
-/*
 typedef enum AnmVM_registers {
     ANM_I1 = 10000,
     ANM_I2 = 10001,
@@ -157,7 +155,6 @@ typedef enum AnmVM_registers {
 
     ANM_FRAND = 10022,
 } AnmVM_registers;
-*/
 
 
 /*

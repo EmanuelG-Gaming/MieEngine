@@ -75,25 +75,25 @@ int AnmVM::getIntVar(AnmVM *self, int id)
 {
     switch (id)
     {
-        case 10000:
+        case ANM_I1:
             return self->intVars[0];
-        case 10001:
+        case ANM_I2:
             return self->intVars[1];
-        case 10002:
+        case ANM_I3:
             return self->intVars[2];
-        case 10003:
+        case ANM_I4:
             return self->intVars[3];
 
-        case 10004:
+        case ANM_F1:
             return static_cast<int> (self->floatVars[0]);
-        case 10005:
+        case ANM_F2:
             return static_cast<int> (self->floatVars[1]);
-        case 10006:
+        case ANM_F3:
             return static_cast<int> (self->floatVars[2]);
-        case 10007:
+        case ANM_F4:
             return static_cast<int> (self->floatVars[3]);
 
-        case 10010:
+        case ANM_IRAND:
             // Get RNG number.
             return RNG_boundedRand(2100000);
 
@@ -106,22 +106,22 @@ int* AnmVM::getIntVarPtr(AnmVM *self, int *id)
 {
     switch (*id)
     {
-        case 10000:
+        case ANM_I1:
             return &self->intVars[0];
-        case 10001:
+        case ANM_I2:
             return &self->intVars[1];
-        case 10002:
+        case ANM_I3:
             return &self->intVars[2];
-        case 10003:
+        case ANM_I4:
             return &self->intVars[3];
 
-        case 10004:
+        case ANM_F1:
             return reinterpret_cast<int*> (&self->floatVars[0]);
-        case 10005:
+        case ANM_F2:
             return reinterpret_cast<int*> (&self->floatVars[1]);
-        case 10006:
+        case ANM_F3:
             return reinterpret_cast<int*> (&self->floatVars[2]);
-        case 10007:
+        case ANM_F4:
             return reinterpret_cast<int*> (&self->floatVars[3]);
 
         default:
@@ -133,37 +133,38 @@ int* AnmVM::getIntVarPtr(AnmVM *self, int *id)
 float AnmVM::getFloatVar(AnmVM* self, float id)
 {
     int roundedId = static_cast<int> (id);
-    int index = roundedId - 10000;
+    //int index = roundedId - 10000;
 
-    switch (static_cast<int>(index))
+    switch (static_cast<int>(roundedId))
     {
-        case 0:
+        case ANM_I1:
             return static_cast<float> (self->intVars[0]);
-        case 1:
+        case ANM_I2:
             return static_cast<float> (self->intVars[1]);
-        case 2:
+        case ANM_I3:
             return static_cast<float> (self->intVars[2]);
-        case 3:
+        case ANM_I4:
             return static_cast<float> (self->intVars[3]);
 
-        case 4:
+        case ANM_F1:
             return self->floatVars[0];
-        case 5:
+        case ANM_F2:
             return self->floatVars[1];
-        case 6:
+        case ANM_F3:
             return self->floatVars[2];
-        case 7:
+        case ANM_F4:
             return self->floatVars[3];
 
-        case 13:
+        case ANM_POSX:
             return self->pos.x;
-        case 14:
+        case ANM_POSY:
             return self->pos.y;
-        case 15:
+        case ANM_POSZ:
             return self->pos.z;
 
-        case 22:
-            return RNG_randf32_range(-1000.0f, 1000.0f);
+        // Random number.
+        case ANM_FRAND:
+            return RNG_randf32_range(-1.0f, 1.0f);
 
         default:
             return id;
@@ -174,20 +175,20 @@ float* AnmVM::getFloatVarPtr(AnmVM *self, float* id)
 {
     switch (static_cast<int>(*id))
     {
-        case 10004:
+        case ANM_F1:
             return &self->floatVars[0];
-        case 10005:
+        case ANM_F2:
             return &self->floatVars[1];
-        case 10006:
+        case ANM_F3:
             return &self->floatVars[2];
-        case 10007:
+        case ANM_F4:
             return &self->floatVars[3];
 
-        case 10013:
+        case ANM_POSX:
             return &self->pos.x;
-        case 10014:
+        case ANM_POSY:
             return &self->pos.y;
-        case 10015:
+        case ANM_POSZ:
             return &self->pos.z;
 
         default:
@@ -536,12 +537,12 @@ void AnmVM::run(AnmVM* self)
 
         switch (opcode)
         {
-            case 0: // nop
+            case ANM_NOP: // nop
             {
             } break;
 
             // Destroys the VM.
-            case 1: // destroy()
+            case ANM_DESTROY: // destroy()
             {
                 self->flags &= ~1;
                 self->currentInstr = NULL;
@@ -549,14 +550,14 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Freezes the graphics until it is destroyed.
-            case 2: // freeze()
+            case ANM_FREEZE: // freeze()
             {
                 self->currentInstr = NULL;
                 gGameSpeed = gameSpeed;
             } break;
 
             // Sets up a sprite.
-            case 3: // sprite(int id)
+            case ANM_SPRITE: // sprite(int id)
             {
                 int spriteNumber = self->getIntArg(0);
                 self->flags |= 1;
@@ -564,7 +565,7 @@ void AnmVM::run(AnmVM* self)
                 // Draw a certain sprite here.
             } break;
 
-            case 4: // jmp(int dest, int t)
+            case ANM_JMP: // jmp(int dest, int t)
             {
                 int dest = self->currentInstr->args[0].i;
                 int t = self->currentInstr->args[1].i;
@@ -575,7 +576,7 @@ void AnmVM::run(AnmVM* self)
 
             // Decrement count and then jump if count < 0.
             // You can use this to repeat a loop a fixed amount of times.
-            case 5: // jmpDec(int dest, int t)
+            case ANM_JMP_DEC: // jmpDec(int dest, int t)
             {
                 int* count = self->getIntArgPtr(0);
                 int dest = self->getIntArg(1);
@@ -593,7 +594,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b.
-            case 6: // iset(int& a, int b)
+            case ANM_ISET: // iset(int& a, int b)
             {
                 int src = self->getIntArg(1);
                 int* dest = self->getIntArgPtr(0);
@@ -602,7 +603,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b.
-            case 7: // fset(float& a, float b)
+            case ANM_FSET: // fset(float& a, float b)
             {
                 float src = self->getFloatArg(1);
                 float* dest = self->getFloatArgPtr(0);
@@ -611,7 +612,7 @@ void AnmVM::run(AnmVM* self)
             }
 
             // Does a += b.
-            case 8: // iadd(int& a, int b)
+            case ANM_IADD: // iadd(int& a, int b)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -619,7 +620,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a += b.
-            case 9: // fadd(float& a, float b)
+            case ANM_FADD: // fadd(float& a, float b)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -628,7 +629,7 @@ void AnmVM::run(AnmVM* self)
 
 
             // Does a -= b.
-            case 10: // isub(int& a, int b)
+            case ANM_ISUB: // isub(int& a, int b)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -636,7 +637,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a -= b.
-            case 11: // fsub(float& a, float b)
+            case ANM_FSUB: // fsub(float& a, float b)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -644,7 +645,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a *= b.
-            case 12: // imul(int& a, int b)
+            case ANM_IMUL: // imul(int& a, int b)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -652,7 +653,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a *= b.
-            case 13: // fmul(float& a, float b)
+            case ANM_FMUL: // fmul(float& a, float b)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -660,7 +661,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a /= b.
-            case 14: // idiv(int& a, int b)
+            case ANM_IDIV: // idiv(int& a, int b)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -668,7 +669,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a /= b.
-            case 15: // fdiv(float& a, float b)
+            case ANM_FDIV: // fdiv(float& a, float b)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -676,7 +677,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a %= b.
-            case 16: // imod(int& a, int b)
+            case ANM_IMOD: // imod(int& a, int b)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -684,7 +685,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a &= b.
-            case 17: // fmod(float& a, float b)
+            case ANM_FMOD: // fmod(float& a, float b)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -692,7 +693,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b+c.
-            case 18: // isetadd(int& a, int b, int c)
+            case ANM_ISETADD: // isetadd(int& a, int b, int c)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -702,7 +703,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b+c.
-            case 19: // fsetadd(float& a, float b, float c)
+            case ANM_FSETADD: // fsetadd(float& a, float b, float c)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -712,7 +713,7 @@ void AnmVM::run(AnmVM* self)
 
 
             // Does a = b-c.
-            case 20: // isetsub(int& a, int b, int c)
+            case ANM_ISETSUB: // isetsub(int& a, int b, int c)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -721,7 +722,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b-c.
-            case 21: // fsetsub(float& a, float b, float c)
+            case ANM_FSETSUB: // fsetsub(float& a, float b, float c)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -730,7 +731,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b*c.
-            case 22: // isetmul(int& a, int b, int c)
+            case ANM_ISETMUL: // isetmul(int& a, int b, int c)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -739,7 +740,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b*c.
-            case 23: // fsetmul(float& a, float b, float c)
+            case ANM_FSETMUL: // fsetmul(float& a, float b, float c)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -748,7 +749,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b/c.
-            case 24: // isetdiv(int& a, int b, int c)
+            case ANM_ISETDIV: // isetdiv(int& a, int b, int c)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -757,7 +758,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b/c.
-            case 25: // fsetdiv(float& a, float b, float c)
+            case ANM_FSETDIV: // fsetdiv(float& a, float b, float c)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -766,7 +767,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b%c.
-            case 26: // isetmod(int& a, int b, int c)
+            case ANM_ISETMOD: // isetmod(int& a, int b, int c)
             {
                 int* a = self->getIntArgPtr(0);
                 int b = self->getIntArg(1);
@@ -775,7 +776,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Does a = b%c.
-            case 27: // fsetmod(float& a, float b, float c)
+            case ANM_FSETMOD: // fsetmod(float& a, float b, float c)
             {
                 float* a = self->getFloatArgPtr(0);
                 float b = self->getFloatArg(1);
@@ -784,7 +785,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a == b.
-            case 28: // ije(int a, int b, int dest, int t)
+            case ANM_IJE: // ije(int a, int b, int dest, int t)
             {
                 int a = self->getIntArg(0);
                 int b = self->getIntArg(1);
@@ -800,7 +801,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a == b.
-            case 29: // fje(float a, float b, int dest, int t)
+            case ANM_FJE: // fje(float a, float b, int dest, int t)
             {
                 float a = self->getFloatArg(0);
                 float b = self->getFloatArg(1);
@@ -816,7 +817,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a != b.
-            case 30: // ijne(int a, int b, int dest, int t)
+            case ANM_IJNE: // ijne(int a, int b, int dest, int t)
             {
                 int a = self->getIntArg(0);
                 int b = self->getIntArg(1);
@@ -832,7 +833,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a != b.
-            case 31: // fjne(float a, float b, int dest, int t)
+            case ANM_FJNE: // fjne(float a, float b, int dest, int t)
             {
                 float a = self->getFloatArg(0);
                 float b = self->getFloatArg(1);
@@ -848,7 +849,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a < b.
-            case 32: // ijl(int a, int b, int dest, int t)
+            case ANM_IJL: // ijl(int a, int b, int dest, int t)
             {
                 int a = self->getIntArg(0);
                 int b = self->getIntArg(1);
@@ -864,7 +865,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a < b.
-            case 33: // fjl(float a, float b, int dest, int t)
+            case ANM_FJL: // fjl(float a, float b, int dest, int t)
             {
                 float a = self->getFloatArg(0);
                 float b = self->getFloatArg(1);
@@ -881,7 +882,7 @@ void AnmVM::run(AnmVM* self)
 
 
             // Jumps if a <= b.
-            case 34: // ijle(int a, int b, int dest, int t)
+            case ANM_IJLE: // ijle(int a, int b, int dest, int t)
             {
                 int a = self->getIntArg(0);
                 int b = self->getIntArg(1);
@@ -897,7 +898,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a <= b.
-            case 35: // fjle(float a, float b, int dest, int t)
+            case ANM_FJLE: // fjle(float a, float b, int dest, int t)
             {
                 float a = self->getFloatArg(0);
                 float b = self->getFloatArg(1);
@@ -915,7 +916,7 @@ void AnmVM::run(AnmVM* self)
 
 
             // Jumps if a > b.
-            case 36: // ijg(int a, int b, int dest, int t)
+            case ANM_IJG: // ijg(int a, int b, int dest, int t)
             {
                 int a = self->getIntArg(0);
                 int b = self->getIntArg(1);
@@ -931,7 +932,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a > b.
-            case 37: // fjg(float a, float b, int dest, int t)
+            case ANM_FJG: // fjg(float a, float b, int dest, int t)
             {
                 float a = self->getFloatArg(0);
                 float b = self->getFloatArg(1);
@@ -948,7 +949,7 @@ void AnmVM::run(AnmVM* self)
 
 
             // Jumps if a >= b.
-            case 38: // ijge(int a, int b, int dest, int t)
+            case ANM_IJGE: // ijge(int a, int b, int dest, int t)
             {
                 int a = self->getIntArg(0);
                 int b = self->getIntArg(1);
@@ -964,7 +965,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Jumps if a >= b.
-            case 39: // fjge(float a, float b, int dest, int t)
+            case ANM_FJGE: // fjge(float a, float b, int dest, int t)
             {
                 float a = self->getFloatArg(0);
                 float b = self->getFloatArg(1);
@@ -980,7 +981,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Draw a random integer x in [0, n).
-            case 40: // isetRand(int& x, int n)
+            case ANM_ISETRAND: // isetRand(int& x, int n)
             {
                 int* x = self->getIntArgPtr(0);
                 int n = self->getIntArg(0);
@@ -989,7 +990,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Draw a random float x int [0, r].
-            case 41: // fsetRand(float& x, float r)
+            case ANM_FSETRAND: // fsetRand(float& x, float r)
             {
                 float* x = self->getFloatArgPtr(0);
                 float r = self->getFloatArg(1);
@@ -999,7 +1000,7 @@ void AnmVM::run(AnmVM* self)
 
 
             // Compute sin theta in radians.
-            case 42: // fsin(float& dest, float theta)
+            case ANM_FSIN: // fsin(float& dest, float theta)
             {
                 float* dest = self->getFloatArgPtr(0);
                 float theta = self->getFloatArg(1);
@@ -1008,7 +1009,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Compute cos theta in radians.
-            case 43: // fcos(float& dest, float theta)
+            case ANM_FCOS: // fcos(float& dest, float theta)
             {
                 float* dest = self->getFloatArgPtr(0);
                 float theta = self->getFloatArg(1);
@@ -1017,7 +1018,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Compute tan theta in radians.
-            case 44: // ftan(float& dest, float theta)
+            case ANM_FTAN: // ftan(float& dest, float theta)
             {
                 float* dest = self->getFloatArgPtr(0);
                 float theta = self->getFloatArg(1);
@@ -1026,7 +1027,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Compute acos theta in radians.
-            case 45: // facos(float& dest, float theta)
+            case ANM_FACOS: // facos(float& dest, float theta)
             {
                 float* dest = self->getFloatArgPtr(0);
                 float theta = self->getFloatArg(1);
@@ -1035,7 +1036,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Compute atan theta in radians.
-            case 46: // fatan(float& dest, float theta)
+            case ANM_FATAN: // fatan(float& dest, float theta)
             {
                 float* dest = self->getFloatArgPtr(0);
                 float theta = self->getFloatArg(1);
@@ -1044,14 +1045,14 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Reduce an angle modulo 2*PI into the range [-PI, +PI].
-            case 47: // wrapAngle(theta)
+            case ANM_WRAPANGLE: // wrapAngle(theta)
             {
                 float* theta = self->getFloatArgPtr(0);
                 *theta = wrapAngleSum(*theta, 0.0f);
             } break;
 
             // Sets the position of the graphics.
-            case 48: // pos(float x, float y, float z)
+            case ANM_POS: // pos(float x, float y, float z)
             {
                 float px = self->getFloatArg(0);
                 float py = self->getFloatArg(1);
@@ -1066,7 +1067,7 @@ void AnmVM::run(AnmVM* self)
 
             // Sets the graphics' rotation. For 2D objects, only the Z axis rotation
             // should've been used.
-            case 49: // rotate(float rx, float ry, float rz)
+            case ANM_ROTATE: // rotate(float rx, float ry, float rz)
             {
                 float rx = self->getFloatArg(0);
                 float ry = self->getFloatArg(1);
@@ -1076,7 +1077,7 @@ void AnmVM::run(AnmVM* self)
                 self->rotation = { rx, ry, rz };
             } break;
 
-            case 50: // scale(float sx, float sy)
+            case ANM_SCALE: // scale(float sx, float sy)
             {
                 float sx = self->getFloatArg(0);
                 float sy = self->getFloatArg(1);
@@ -1085,13 +1086,13 @@ void AnmVM::run(AnmVM* self)
                 self->scale = { sx, sy };
             } break;
 
-            case 51: // alpha(int alpha)
+            case ANM_ALPHA: // alpha(int alpha)
             {
                 int alpha = self->getIntArg(0);
                 self->color1[3] = alpha / 255.0f;
             } break;
 
-            case 52: // color(int r, int g, int b)
+            case ANM_COLOR: // color(int r, int g, int b)
             {
                 int r = self->getIntArg(0);
                 int g = self->getIntArg(1);
@@ -1103,7 +1104,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Set a constant angular velocity, in rads per frame.
-            case 53: // angleVel(float x, float y, float z)
+            case ANM_ANGLE_VEL: // angleVel(float x, float y, float z)
             {
                 float x = self->getFloatArg(0);
                 float y = self->getFloatArg(1);
@@ -1113,7 +1114,7 @@ void AnmVM::run(AnmVM* self)
                 //self->flags |= 4;
             } break;
 
-            case 54: //scaleGrowth(float gx, float gy)
+            case ANM_SCALE_GROWTH: //scaleGrowth(float gx, float gy)
             {
                 float gx = self->getFloatArg(0);
                 float gy = self->getFloatArg(1);
@@ -1121,7 +1122,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // This one here is used like a wrapper function with more assumed (default) parameters.
-            case 55: // alphaTimeLinear(int alpha, int t)
+            case ANM_ALPHATIME_LINEAR: // alphaTimeLinear(int alpha, int t)
             {
                 int alpha = self->getIntArg(0);
                 int t = self->getIntArg(0);
@@ -1135,7 +1136,7 @@ void AnmVM::run(AnmVM* self)
                 self->alphaInterp.timer.set(&self->alphaInterp.timer, 0);
             } break;
 
-            case 56: // posTime(int t, int mode, float x, float y, float z)
+            case ANM_POSTIME: // posTime(int t, int mode, float x, float y, float z)
             {
                 int t = self->getIntArg(0);
                 int mode = self->getIntArg(1);
@@ -1167,7 +1168,7 @@ void AnmVM::run(AnmVM* self)
             } break;
 
             // Over the next t frames, it changes color to a given value using interp mode.
-            case 57: // colorTime1(int t, int mode, int r, int g, int b)
+            case ANM_COLORTIME1: // colorTime1(int t, int mode, int r, int g, int b)
             {
                 int t = self->getIntArg(0);
                 int mode = self->getIntArg(1);
@@ -1182,7 +1183,7 @@ void AnmVM::run(AnmVM* self)
                 self->rgbInterp.timer.set(&self->rgbInterp.timer, 0);
             } break;
 
-            case 58: // alphaTime1(int t, int mode, int a)
+            case ANM_ALPHATIME1: // alphaTime1(int t, int mode, int a)
             {
                 int t = self->getIntArg(0);
                 int mode = self->getIntArg(1);
@@ -1195,7 +1196,7 @@ void AnmVM::run(AnmVM* self)
                 self->alphaInterp.timer.set(&self->alphaInterp.timer, 0);
             } break;
 
-            case 59: // colorTime2(int t, int mode, int r, int g, int b)
+            case ANM_COLORTIME2: // colorTime2(int t, int mode, int r, int g, int b)
             {
                 int t = self->getIntArg(0);
                 int mode = self->getIntArg(1);
@@ -1210,7 +1211,7 @@ void AnmVM::run(AnmVM* self)
                 self->rgb2Interp.timer.set(&self->rgb2Interp.timer, 0);
             } break;
 
-            case 60: // alphaTime2(int t, int mode, int a)
+            case ANM_ALPHATIME2: // alphaTime2(int t, int mode, int a)
             {
                 int t = self->getIntArg(0);
                 int mode = self->getIntArg(1);
@@ -1223,31 +1224,31 @@ void AnmVM::run(AnmVM* self)
                 self->alpha2Interp.timer.set(&self->alpha2Interp.timer, 0);
             } break;
 
-            case 61: // flipX
+            case ANM_FLIPX: // flipX
             {
             } break;
 
-            case 62: // flipY
+            case ANM_FLIPY: // flipY
             {
             } break;
 
-            case 63: // stop
+            case ANM_STOP: // stop
             {
                 goto stmt;
             }
 
             // A label for an interrupt. When executed, it is a no-op.
-            case 64: // interruptLabel(int n)
+            case ANM_INTERRUPT_LABEL: // interruptLabel(int n)
             {
                 // No-op.
             } break;
 
-            case 65:
+            case ANM_UNKNOWN_65:
             {
             } break;
 
             // Set the color blending mode.
-            case 66: // blendMode(int mode)
+            case ANM_BLENDMODE: // blendMode(int mode)
             {
                 int mode = self->getIntArg(0);
                 self->blend = static_cast<BlendMode>(mode);
@@ -1257,21 +1258,21 @@ void AnmVM::run(AnmVM* self)
             // mode 0: 2D sprites, no rotation.
             // mode 1: 2D sprites, Z-axis rotation.
             // mode 8: 3D rotation.
-            case 67: // type(int mode)
+            case ANM_TYPE: // type(int mode)
             {
                 int mode = self->getIntArg(0);
             } break;
 
 
             // Sets the layer from which the ANM is drawn.
-            case 68: // layer(int n)
+            case ANM_LAYER: // layer(int n)
             {
             } break;
 
             // This is like stop, except it also hides the graphics by clearing the visibility flag.
             // Interpolation instructions like posTime will continue to advance, and interrupts can be triggered at any time.
             // Successful interrupts will automatically re-enable the visibility flag.
-            case 69: // stopHide
+            case ANM_STOPHIDE: // stopHide
             {
                 self->flags &= 0xfffffffe;
 
@@ -1328,19 +1329,13 @@ interrupt:
                 self->timeInScript.addf(&self->timeInScript, -1.0f);
             } break;
 
-            case 70: // colorMode(int mode)
-            {
-                int mode = self->getIntArg(0);
-                self->colorMode = static_cast<ColorMode>(mode);
-            } break;
-
-            case 71: // drawMode(int mode)
+            case ANM_DRAWMODE: // drawMode(int mode)
             {
                 int mode = self->getIntArg(0);
                 self->drawMode = static_cast<AnmVM_drawMode>(mode);
             } break;
 
-            case 72: // regularPoly(int sides, float r1, float r2)
+            case ANM_REGULAR_POLY: // regularPoly(int sides, float r1, float r2)
             {
                 int sides = self->getIntArg(0);
                 float r1 = self->getFloatArg(1);
