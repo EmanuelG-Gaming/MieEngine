@@ -159,6 +159,7 @@ typedef struct CustomVertex {
     u32 color;
     float u, v;
 } CustomVertex;
+//STATIC_GETSIZE(CustomVertex);
 
 
 

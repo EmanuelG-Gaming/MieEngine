@@ -1006,12 +1006,9 @@ static HRESULT InitDirect3D(Window* win)
     return S_OK;
 }
 
-/*
-// Storage draw pass array.
-static DrawPass passes[8];
-// The view matrix is currently unchanged.
-static mat4 viewMat = mat4 { 1.0f };
-*/
+// Default draw pass array.
+static DrawPass _passes[1] = { 0 };
+static mat4 _viewMat { 1.0f };
 
 extern int GraphicsInit(Window* win)
 {
@@ -1023,15 +1020,18 @@ extern int GraphicsInit(Window* win)
         LogErrorEmitF("%s: Failed to initialize drawing subroutine!\n", __func__);
         return -1;
     }
-    /*
 
-    DrawSetPipeline(1, passes);
-    DrawSetPass2D(&passes[0]);
-    passes[0].active = TRUE;
-    passes[0].viewMatrix = &viewMat;
-    //passes[0].flags |= DRAW_PASS_FLAG_GAMMA;
+    DrawSetPipeline(1, _passes);
+    DrawSetPass2D(&_passes[0]);
+    _passes[0].active = TRUE;
+    _passes[0].viewMatrix = &_viewMat;
+    _passes[0].flags |= DRAW_PASS_FLAG_GAMMA;
+
+    // Reset state.
+    DrawReset();
     DrawSetTarget();
-    */
+
+    drawState.currentPass = 0;
 
     // We don't load a shader (Yet) because we let DirectX9 handle the shaders
     // through the global state machine.

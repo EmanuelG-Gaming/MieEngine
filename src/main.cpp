@@ -912,10 +912,67 @@ int LogTesting(void)
     return 0;
 }
 
+int ExampleTesting(void)
+{
+    PlatformInit();
+
+    ARENA* arena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
+    Window* window = WindowInit(arena, L"Testing window", 640, 480);
+
+    GraphicsInit(window);
+
+    int t = 1;
+    while (WindowOpened(window))
+    {
+        // Poll events.
+        WindowProcessEvents(window);
+
+        // RGB format: (0, 17, 85).
+        DrawClear(0x001155);
+
+        DrawBegin();
+
+        //DrawReset();
+
+        //DrawRect(0.1, 0.1);
+        //DrawMatTranslate3D(0.1f, 0.5f, 0.0f);
+
+        for (int i = 0; i < t; ++i)
+        {
+            DrawRect(0.5, 0.5);
+        }
+
+        //printf("t: %d\n", t);
+
+
+        //DrawRect(0.5, 0.5);
+
+
+
+        //DrawFlush();
+
+        // Present the framebuffer to the screen.
+        DrawEnd();
+
+        //t++;
+    }
+
+    GraphicsTerminate();
+    WindowTerminate(window);
+
+    PlatformTerminate();
+
+    ArenaTerminate(arena);
+
+    return 0;
+}
+
 int main()
 {
     //LogTesting();
+    //ExampleTesting();
     WindowTesting();
+
     return 0;
 }
 
