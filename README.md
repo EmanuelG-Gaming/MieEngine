@@ -1,4 +1,4 @@
-# DXApplication
+# MieEngine
 A minimalist game framework/engine written in C++,
 with DirectX9 and no uCRT being used, allowing the application to have very small binary sizes.
 
