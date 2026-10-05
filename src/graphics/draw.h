@@ -162,6 +162,14 @@ typedef struct CustomVertex {
 //STATIC_GETSIZE(CustomVertex);
 
 
+typedef struct CustomVertexDX11 {
+    float x, y, z;
+    float nx, ny, nz;
+    float u, v;
+
+    float r, g, b, a;
+} CustomVertexDX11;
+
 
 typedef struct GFX_shader GFX_shader;
 
@@ -297,7 +305,7 @@ extern void DrawColorMode(ColorMode mode);
 extern void DrawColor(float r, float g, float b, float a);
 extern void DrawColor2(float r, float g, float b, float a);
 
-extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* data, int nVertices);
+extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* data, void* indices, int nVertices);
 extern void DrawMeshTerminate(GFX_mesh* mesh);
 extern void DrawRenderMesh(GFX_mesh* mesh);
 

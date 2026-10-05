@@ -1,4 +1,4 @@
-#define GFX_USE_DX9
+#define GFX_USE_DX11
 
 #if defined(GFX_USE_DX9)
 #include "dx9/graphics.cpp"

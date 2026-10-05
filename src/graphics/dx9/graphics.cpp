@@ -824,7 +824,7 @@ extern void DrawEnd(void)
 
 
 
-extern GFX_mesh* DrawUploadMesh(ARENA* arena, void *data, int nVertices)
+extern GFX_mesh* DrawUploadMesh(ARENA* arena, void *data, void* indices, int nVertices)
 {
     //GFX_mesh* mesh = ArenaPushStruct(arena, GFX_mesh);
 

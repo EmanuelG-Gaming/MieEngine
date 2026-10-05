@@ -12,12 +12,10 @@
 //#include "mem/arena.h"
 //#include "../ext/arena.cpp"
 #include "graphics/texture.h"
-#include "platform/platform.cpp"
-#include "mem/arena.cpp"
+
 
 #include "platform/platform.h"
-#include "win/win.h"
-#include "win/win.cpp"
+
 
 // Logging/strings.
 #include "base/base_string.h"
@@ -77,7 +75,12 @@
 #include "runtime/anm_manager.h"
 #include "runtime/anm_manager.cpp"
 
+#include "mem/arena.cpp"
 
+//#include "win/win.h"
+#include "win/win.cpp"
+
+#include "platform/platform.cpp"
 
 AnmManager* g_anmManager = NULL;
 
@@ -917,8 +920,7 @@ int ExampleTesting(void)
     PlatformInit();
 
     ARENA* arena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
-    Window* window = WindowInit(arena, L"Testing window", 640, 480);
-
+    Window* window = WindowInit(arena, L"Example window", 640, 480);
     GraphicsInit(window);
 
     int t = 1;
@@ -930,9 +932,10 @@ int ExampleTesting(void)
         // RGB format: (0, 17, 85).
         DrawClear(0x001155);
 
-        DrawBegin();
+        DrawReset();
+        DrawSetTarget();
 
-        //DrawReset();
+        DrawBegin();
 
         //DrawRect(0.1, 0.1);
         //DrawMatTranslate3D(0.1f, 0.5f, 0.0f);
@@ -970,8 +973,8 @@ int ExampleTesting(void)
 int main()
 {
     //LogTesting();
-    //ExampleTesting();
-    WindowTesting();
+    ExampleTesting();
+    //WindowTesting();
 
     return 0;
 }

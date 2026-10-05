@@ -1,23 +1,13 @@
 #include "../win.h"
 
+#include <stdlib.h>
 
 //#include "../../platform/win32/platform.h"
 #include "../../base/base_log.h"
 
-#ifdef _WIN32
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#define UNICODE
-#define _UNICODE
-#include <windows.h>
-#include <minwinbase.h>
+#include "platform.h"
 
-//#include <d3d11.h>
-//#include <d3dcompiler.h>
-#endif /* _WIN32 */
-
-
-#define WIN_CLASS_NAME "CustomWindow"
+#define WIN_CLASS_NAME L"CustomWindow"
 
 typedef struct WinBackend {
     HINSTANCE hinstance;
@@ -178,11 +168,15 @@ extern Window* WindowInit(ARENA* arena, const wchar_t* title, int width, int hei
 
 
     Window* win = ArenaPushStruct(arenaTemp.arena, Window);
+    //Window* win = (Window *) _MALLOC(sizeof(Window));
     win->title = title;
     win->w = width;
     win->h = height;
     win->flags = 0;
+
     win->backend = ArenaPushStruct(arenaTemp.arena, WinBackend);
+    //win->backend = (WinBackend *) _MALLOC(sizeof(WinBackend));
+    //_MEMSET(win->backend, 0, sizeof(WinBackend));
 
     RECT winRect = { 0, 0, (int) width, (int) height };
     if (!AdjustWindowRect(&winRect, WS_OVERLAPPEDWINDOW, FALSE))
@@ -193,8 +187,8 @@ extern Window* WindowInit(ARENA* arena, const wchar_t* title, int width, int hei
     }
 
     win->backend->hwnd = CreateWindowW(
-        L"CustomWindow",
-        win->title, WS_OVERLAPPEDWINDOW, // WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_POPUP | WS_OVERLAPPEDWINDOW,
+        WIN_CLASS_NAME,
+        win->title, WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_POPUP | WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         winRect.right - winRect.left, winRect.bottom - winRect.top,
         NULL, NULL, NULL, NULL
@@ -431,11 +425,10 @@ static int RegisterWinClass(void)
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH) (COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
-    wc.lpszClassName = WIN_CLASS_NAME;
+    wc.lpszClassName = "CustomWindow";
     wc.cbSize = sizeof(WNDCLASSEX);
 
     ATOM atom = RegisterClassEx(&wc);
-
     if (!atom)
     {
         LogErrorEmitF("%s: Failed to register window class!\n", __func__);

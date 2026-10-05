@@ -4,6 +4,7 @@
 #include "../base/base_defs.h"
 #include "../mem/arena.h"
 
+
 #define MOUSE_LEFT (0)
 #define MOUSE_MIDDLE (1)
 #define MOUSE_RIGHT (2)
@@ -25,10 +26,11 @@ typedef struct Input {
 } Input;
 
 typedef struct Window {
+    const wchar_t* title;
+
     WinBackend* backend;
     void* user;
 
-    const wchar_t* title;
     u32 w, h;
 
     u32 flags;

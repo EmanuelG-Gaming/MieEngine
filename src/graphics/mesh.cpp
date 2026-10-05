@@ -327,7 +327,8 @@ extern GFX_mesh* MeshBuilderCreateMesh(MeshBuilder* mesh, ARENA* uploadTo)
     // Also deallocate the mesh builder buffers along the way.
     //MeshBuilderTerminate(mesh);
 
-    GFX_mesh* res = DrawUploadMesh(uploadTo, output, mesh->nVertices);
+    // TODO: fix.
+    GFX_mesh* res = DrawUploadMesh(uploadTo, output, NULL, mesh->nVertices);
 
 
     return res;
