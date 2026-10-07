@@ -2,7 +2,24 @@
    Refer to the Advanced 3D game programming textbook with DirectX9.
 */
 
+// TLDR: always make sure that you define
+// the Windows compile-time config macros.
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+#define _UNICODE
+
+
+
+//#include "win/win.cpp"
+
+
+
 #include "../ext/arena.cpp"
+
+#include "graphics/graphics.cpp"
+
+#include "mem/arena.h"
 
 
 #include "audio/audio.h"
@@ -34,7 +51,7 @@
 // Graphics.
 #include "graphics/draw.h"
 #include "graphics/draw.cpp"
-#include "graphics/graphics.cpp"
+
 
 #include "graphics/mesh.h"
 #include "graphics/mesh.cpp"
@@ -49,6 +66,7 @@
 #include "graphics/image/image.cpp"
 #include "graphics/texture.h"
 #include "graphics/texture.cpp"
+
 
 
 // Assets
@@ -75,81 +93,14 @@
 #include "runtime/anm_manager.h"
 #include "runtime/anm_manager.cpp"
 
-#include "mem/arena.cpp"
+//#include "mem/arena.cpp"
 
-//#include "win/win.h"
-#include "win/win.cpp"
+#include "win/win.h"
+//#include "win/win.cpp"
 
 #include "platform/platform.cpp"
 
 AnmManager* g_anmManager = NULL;
-
-/*
-#define NOMINMAX
-#include <windows.h>
-#include <winnt.h>
-
-// Use GDI to draw text.
-
-#pragma comment(lib, "d3d9.lib")
-#pragma comment(lib, "GDI32.lib")
-*/
-
-/*
-static inline int CstrLen(const char* cstr)
-{
-    const char* ptr = cstr;
-    for (; *ptr; ++ptr) {};
-    return (int) (ptr - cstr);
-}
-
-// Only counts the logical codepoints of wchar_t.
-static inline int WstrLen(const wchar_t* cstr)
-{
-    const wchar_t* ptr = cstr;
-    for (; *ptr; ++ptr) {};
-    return (int) (ptr - cstr);
-}
-*/
-
-
-
-/*
-   Forward declarations.
-*/
-
-/*
-   Window name? Window struct?
-*/
-
-/*
-HINSTANCE hinst;
-
-static ATOM MyRegisterClass(HINSTANCE hinstance);
-static BOOL InitInstance(HINSTANCE, int);
-static LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
-static LRESULT CALLBACK About(HWND, UINT, WPARAM, LPARAM);
-*/
-
-/*
-   Defined in the linker.
-*/
-
-/*
-int APIENTRY WinMain(HINSTANCE hinstance, HINSTANCE hprevinstance, LPSTR lpcmdline, int nCmdShow);
-
-//extern "C" int __stdcall customMain()
-int main()
-{
-    return WinMain(GetModuleHandle(NULL), NULL, GetCommandLineA(), SW_SHOWDEFAULT);
-}
-*/
-
-
-
-/*
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-*/
 
 static inline float EasingNone(float t)
 {
@@ -917,11 +868,34 @@ int LogTesting(void)
 
 int ExampleTesting(void)
 {
-    PlatformInit();
+    {
+        LogFrameBegin();
+    }
+
+    //PlatformInit();
 
     ARENA* arena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
     Window* window = WindowInit(arena, L"Example window", 640, 480);
     GraphicsInit(window);
+
+    {
+        String8 res = LogFrameEnd(arena, LOG_ALL, LOG_RES_CONCAT, TRUE);
+        FastPrint(res);
+    }
+
+    // Upload mesh.
+    float vertexData[] = {
+        // x, y, z, nx, ny, nz, u, v, r, g, b, a.
+        -0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 0.0f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        0.0f, 0.5f, 0.0f,  0.0f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 1.0f, 0.0f, 1.0f,
+        0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f, 1.0f,
+    };
+
+    int indices[] = {
+        0, 1, 2,
+    };
+
+    GFX_mesh* mesh = DrawUploadMesh(arena, vertexData, indices, 3);
 
     int t = 1;
     while (WindowOpened(window))
@@ -931,15 +905,19 @@ int ExampleTesting(void)
 
         // RGB format: (0, 17, 85).
         DrawClear(0x001155);
-
         DrawReset();
         DrawSetTarget();
 
         DrawBegin();
 
-        //DrawRect(0.1, 0.1);
+        DrawColor(0, 0, 0, 1.0);
+        DrawColor2(0, 0, 0, 0);
+        DrawColorMode(COLOR_LR);
+
+        DrawRect(0.1, 0.1);
         //DrawMatTranslate3D(0.1f, 0.5f, 0.0f);
 
+        /*
         for (int i = 0; i < t; ++i)
         {
             DrawRect(0.5, 0.5);
@@ -948,16 +926,18 @@ int ExampleTesting(void)
         //printf("t: %d\n", t);
 
 
-        //DrawRect(0.5, 0.5);
+        DrawRect(0.5, 0.5);
+        */
 
 
+        DrawFlush();
 
-        //DrawFlush();
+        //DrawRenderMesh(mesh);
 
         // Present the framebuffer to the screen.
         DrawEnd();
 
-        //t++;
+        t++;
     }
 
     GraphicsTerminate();
@@ -979,91 +959,3 @@ int main()
     return 0;
 }
 
-/*
-ATOM MyRegisterClass(HINSTANCE hinstance)
-{
-    WNDCLASSEX w;
-    w.cbSize = sizeof(WNDCLASSEX);
-    w.style = CS_HREDRAW | CS_VREDRAW;
-    w.lpfnWndProc = (WNDPROC) WindowProc;
-    w.cbClsExtra = 0;
-    w.cbWndExtra = 0;
-    w.hInstance = hinstance;
-    w.hIcon = LoadIcon(hinstance, (LPCTSTR) IDI_APPLICATION);
-    w.hCursor = LoadCursor(NULL, IDC_ARROW);
-    w.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
-w.lpszMenuName = NULL;
-    w.lpszClassName = L"Engine Window";
-    w.hIconSm = LoadIcon(w.hInstance, (LPCTSTR) IDI_APPLICATION);
-    return RegisterClassEx(&w);
-}
-
-BOOL InitInstance(HINSTANCE hinstance, int nCmdShow)
-{
-    HWND hwnd;
-
-    hinst = hinstance;
-
-    hwnd = CreateWindow(
-        L"Engine Window",
-        L"Engine Window",
-        WS_OVERLAPPEDWINDOW,
-        20, // Starting X.
-        20, // Starting Y.
-        640, 480,
-        NULL, NULL, hinstance, NULL
-    );
-
-    if (!hwnd)
-    {
-        return FALSE;
-    }
-
-    ShowWindow(hwnd, nCmdShow);
-    UpdateWindow(hwnd);
-
-    return TRUE;
-}
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
-{
-    PAINTSTRUCT ps;
-    HDC hdc;
-
-    const wchar_t* string = L"8KB application that uses GDI calls (With no uCRT)";
-
-
-    switch (message)
-    {
-        case WM_PAINT:
-        {
-            hdc = BeginPaint(hwnd, &ps);
-            // TODO: Add drawing code here...
-
-            RECT rt;
-            GetClientRect(hwnd, &rt);
-            DrawTextW(hdc, string, WstrLen(string), &rt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-            EndPaint(hwnd, &ps);
-        } break;
-
-        case WM_SIZE:
-        {
-        } break;
-
-        case WM_DESTROY:
-        {
-            PostQuitMessage(0);
-            break;
-        } break;
-
-        default:
-        {
-            return DefWindowProc(hwnd, message, wparam, lparam);
-        }
-    }
-
-    return 0;
-}
-
-*/

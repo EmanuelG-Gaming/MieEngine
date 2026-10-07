@@ -2,7 +2,7 @@
 #define PLAT_H_ 1
 
 /*
-   NOTE: Duct-taped solution, maybe>
+   NOTE: Duct-taped solution, maybe?
 */
 
 #ifdef _WIN32
@@ -12,7 +12,7 @@
 #define _UNICODE
 
 #include <windows.h>
-#include <minwinbase.h>
+//#include <minwinbase.h>
 
 //#include <d3d11.h>
 //#include <d3dcompiler.h>

@@ -5,12 +5,15 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include "../../win/win32/window.cpp"
+
 #include <d3d11.h>
 
 /*
    TODO: Use shader bytecode directly?
 */
 #include <d3dcompiler.h>
+
 
 
 // Multiline string.
@@ -29,7 +32,7 @@ static const char* color_vs = D3D_HLSL_DECL(
         //float3 color: COLOR;
 
         //float3 position: POSITION;
-        
+
         //float4 tangents: TANGENTS;
         //float4 joints: JOINTS;
         //float4 weights: WEIGHTS;
@@ -175,8 +178,8 @@ typedef struct ConstantPsLight {
 } ConstantPsLight;
 
 typedef struct ConstantPsScene {
-    //ConstantPsLight dirLight;
-    //ConstantPsLight pointLights[8];
+    ConstantPsLight dirLight;
+    ConstantPsLight pointLights[8];
 
     float fogMin, fogMax;
     int unused[2]; // Alignment.
@@ -194,18 +197,15 @@ typedef struct ConstantPS {
 /*
    Render state.
 */
-
+/*
 static int currNverts;
 static int currNindices;
 
 DRAWSTATE drawState;
 
-static mat4 identMat = mat4 { 1.0f };
+static mat4 identMat { 1.0f };
 
-/*
-   Direct3D variables.
-*/
-
+// Direct3D variables.
 static ID3D11Device* d3device = NULL;
 static ID3D11DeviceContext* immediateContext = NULL;
 static IDXGISwapChain* pSwapchain = NULL;
@@ -229,7 +229,6 @@ static ID3D11BlendState* blendStates[BLEND_COUNT];
 // Vertex and index buffer.
 static ID3D11Buffer* streamVertexBuffer = NULL;
 static ID3D11Buffer* streamIndexBuffer = NULL;
-
 static D3D11_MAPPED_SUBRESOURCE streamVertexMappedBuffer;
 static D3D11_MAPPED_SUBRESOURCE streamIndexMappedBuffer;
 
@@ -239,15 +238,14 @@ static ID3D11Buffer* constantPSBuffer = NULL;
 static ID3D11Buffer* constantPSSceneBuffer = NULL;
 
 
-/*
-   DXGI (are these really necessary)?
-*/
+// DXGI (are these really necessary)?
 static IDXGIFactory* dxgiFactory = NULL;
 static IDXGIAdapter* dxgiAdapter = NULL;
 static IDXGIOutput* adapterOutput = NULL;
 static char videoCardDescription[128];
 
 
+static D3D11_VIEWPORT viewport;
 
 typedef struct TargetSurface {
     GFX_texture color;
@@ -259,11 +257,71 @@ typedef struct TargetSurface {
 static TargetSurface surface1;
 static TargetSurface surface2;
 
-
 // The 3rd target surface (the one needed to be shown to the screen).
 static ID3D11Texture2D* framebuffer = NULL;
 static ID3D11RenderTargetView* framebufferView = NULL;
+*/
+
+DRAWSTATE drawState;
+
+static mat4 identMat { 1.0f };
+
+/*
+   Direct3D variables.
+*/
+
+static ID3D11Device* d3device = NULL;
+static ID3D11DeviceContext* immediateContext = NULL;
+static IDXGISwapChain* pSwapchain = NULL;
+
+// Sampler.
+static ID3D11SamplerState* linearSampler = NULL;
+static ID3D11SamplerState* pointSampler = NULL;
+// Raster.
+static ID3D11RasterizerState* raster2D = NULL;
+static ID3D11RasterizerState* raster3D = NULL;
+static ID3D11RasterizerState* raster3DInvert = NULL;
+// Depth stencil.
+static ID3D11DepthStencilState* depthStencil3D = NULL;
+static ID3D11DepthStencilState* depthStencil3DNoWrite = NULL;
+static ID3D11DepthStencilState* depthStencil2D = NULL;
+// Blending modes.
+static ID3D11BlendState* blendStates[BLEND_COUNT];
+
+// Vertex and index buffer.
+static ID3D11Buffer* streamVertexBuffer = NULL;
+static ID3D11Buffer* streamIndexBuffer = NULL;
+static ID3D11Buffer* constantVSBuffer = NULL;
+static ID3D11Buffer* constantPSBuffer = NULL;
+static ID3D11Buffer* constantPSSceneBuffer = NULL;
+static int currNverts;
+static int currNindices;
+static D3D11_MAPPED_SUBRESOURCE streamVertexMappedBuffer;
+static D3D11_MAPPED_SUBRESOURCE streamIndexMappedBuffer;
+
+//static ID3D11Texture2D* backBuffer = NULL;
+
+// DXGI.
+static IDXGIFactory* dxgiFactory = NULL;
+static IDXGIAdapter* dxgiAdapter = NULL;
+static IDXGIOutput* adapterOutput = NULL;
+static char videoCardDescription[128];
+
 static D3D11_VIEWPORT viewport;
+
+typedef struct TargetSurface {
+    GFX_texture color;
+    GFX_texture depthStencil;
+    ID3D11RenderTargetView* colorView;
+    ID3D11DepthStencilView* depthStencilView;
+} TargetSurface;
+
+static TargetSurface surface1;
+static TargetSurface surface2;
+static ID3D11Texture2D* framebuffer = NULL;
+static ID3D11RenderTargetView* framebufferView = NULL;
+
+
 
 
 /*
@@ -429,8 +487,7 @@ static void DoGamma(float* r, float* g, float* b)
    ...along with the shader uniform constants.
 */
 
-/*
-static void CopyLight(DrawPass* pass, ConstantPsLight* dest, Light* l, b32 pointSource)
+static void CopyLight(DrawPass* pass, ConstantPsLight* dest, GFX_light* l, b32 pointSource)
 {
     if (pointSource)
     {
@@ -468,7 +525,7 @@ static void CopyLight(DrawPass* pass, ConstantPsLight* dest, Light* l, b32 point
     dest->quadratic = l->quadratic;
     dest->intensity = l->intensity;
 }
-*/
+
 
 static void SetNormalMat(void)
 {
@@ -486,13 +543,12 @@ static void SetScenePSConstants(void)
     immediateContext->Map(constantPSSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBuffer);
 
     ConstantPsScene* scene = (ConstantPsScene *) mappedBuffer.pData;
+
     // Copy the lights.
-    /*
     CopyLight(pass, &scene->dirLight, pass->dirLight, FALSE);
     for (int i = 0; i < DRAW_MAX_POINTLIGHTS; ++i) {
         CopyLight(pass, &scene->pointLights[i], &pass->pointLights[i], TRUE);
     }
-    */
 
     // Fog.
     float fog[3] = {
@@ -629,6 +685,7 @@ extern void DrawFlush(void)
         UINT stride = sizeof(CustomVertexDX11);
         UINT offset = 0;
 
+
         // TODO: bruhh this has to be the issue.
         immediateContext->IASetVertexBuffers(0, 1, &streamVertexBuffer, &stride, &offset);
         immediateContext->IASetIndexBuffer(streamIndexBuffer, DXGI_FORMAT_R32_UINT, 0);
@@ -675,7 +732,7 @@ extern void DrawVertex3D(float x, float y, float z,
 
     // TODO: It needs to be aligned.
     d->x = pos.x;
-    d->y = -pos.y;
+    d->y = pos.y;
     d->z = pos.z;
     d->nx = normal.x;
     d->ny = normal.y;
@@ -713,7 +770,7 @@ extern void DrawIndices(int verts, int n, unsigned int const* st)
     int base = currNverts - verts;
     for (int i = 0; i < n; ++i)
     {
-        ((int *) (streamIndexMappedBuffer.pData))[currNindices++] = base + st[i];
+        (static_cast<int *> (streamIndexMappedBuffer.pData))[currNindices++] = base + st[i];
     }
 }
 
@@ -811,7 +868,7 @@ extern void DrawZBufferWrite(b32 flag)
         if (flag) {
             immediateContext->OMSetDepthStencilState(depthStencil3D, 0);
         } else {
-            immediateContext->OMSetDepthStencilState(depthStencil3DnoWrite, 0);
+            immediateContext->OMSetDepthStencilState(depthStencil3DNoWrite, 0);
         }
         drawState.zWrite = flag;
     }
@@ -841,7 +898,7 @@ extern void DrawCullInvert(b32 invert)
     {
         DrawFlush();
         if (invert) {
-            immediateContext->RSSetState(raster3Dinvert);
+            immediateContext->RSSetState(raster3DInvert);
         } else {
             immediateContext->RSSetState(raster3D);
         }
@@ -916,7 +973,7 @@ extern void DrawSetTarget(void)
             immediateContext->OMSetDepthStencilState(depthStencil3D, 0);
             break;
         case DEPTH_STENCIL_NO_WRITE:
-            immediateContext->OMSetDepthStencilState(depthStencil3DnoWrite, 0);
+            immediateContext->OMSetDepthStencilState(depthStencil3DNoWrite, 0);
             break;
     }
 
@@ -935,7 +992,7 @@ extern void DrawSetTarget(void)
             immediateContext->RSSetState(raster3D);
             break;
         case CULL_FRONT:
-            immediateContext->RSSetState(raster3Dinvert);
+            immediateContext->RSSetState(raster3DInvert);
             break;
     }
 }
@@ -944,15 +1001,20 @@ extern void DrawSetTarget(void)
 extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* verts, void* indices, int nVertices)
 {
     // TODO: Might be an issue.
-    GFX_mesh* m = ArenaPushStruct(arena, GFX_mesh);
+    //GFX_mesh* m = ArenaPushStruct(arena, GFX_mesh);
+    GFX_mesh* m = new GFX_mesh;
+    m->nElements = nVertices / 3;
+
 
     size_t vertexSize = sizeof(CustomVertexDX11);
 
     D3D11_BUFFER_DESC bd;
     ZeroMemory(&bd, sizeof(bd));
     bd.Usage = D3D11_USAGE_IMMUTABLE;
-    bd.ByteWidth = vertexSize * m->nElements;
+    bd.ByteWidth = vertexSize * nVertices;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+    fprintf(stderr, "%s: buffer descriptor byte width: %d\n", __func__, bd.ByteWidth);
 
     D3D11_SUBRESOURCE_DATA subres;
     subres.pSysMem = verts;
@@ -960,10 +1022,10 @@ extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* verts, void* indices, int nV
     subres.SysMemSlicePitch = 0;
 
     ID3D11Buffer* buffer;
-    if (FAILED(d3device->CreateBuffer(&bd, NULL, &buffer)))
+    if (FAILED(d3device->CreateBuffer(&bd, &subres, &buffer)))
     {
         // TODO: Temporary arena buffer management.
-        fprintf(stderr, "%s: Failed to create buffer!\n", __func__);
+        fprintf(stderr, "%s: Failed to create vertex buffer!\n", __func__);
         return NULL;
     }
     m->vertexData = buffer;
@@ -972,19 +1034,18 @@ extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* verts, void* indices, int nV
     bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
     subres.pSysMem = indices;
     subres.SysMemPitch = 4; // 4 bytes per integer.
-    if (FAILED(d3device->CreateBuffer(&bd, NULL, &buffer)))
+    if (FAILED(d3device->CreateBuffer(&bd, &subres, &buffer)))
     {
-        fprintf(stderr, "%s: Failed to create buffer!\n", __func__);
+        fprintf(stderr, "%s: Failed to create index buffer!\n", __func__);
         return NULL;
     }
+
     m->indexData = buffer;
-
-    m->nElements = nVertices / 3;
-
+ 
     return m;
 }
 
-/*
+
 extern void ReleaseMesh(GFX_mesh* m)
 {
     ID3D11Buffer* buf;
@@ -995,15 +1056,14 @@ extern void ReleaseMesh(GFX_mesh* m)
 
     //MeshTerminate(m);
 }
-*/
 
 extern void DrawRenderMesh(GFX_mesh* m)
 {
     DrawFlush();
     Draw_SetConstants(&drawState.matStack[drawState.matStackIdx]);
 
-    ID3D11Buffer* verts = reinterpret_cast<ID3D11Buffer *>(m->vertexData);
-    ID3D11Buffer* indices = reinterpret_cast<ID3D11Buffer *>(m->indexData);
+    ID3D11Buffer* verts = static_cast<ID3D11Buffer *>(m->vertexData);
+    ID3D11Buffer* indices = static_cast<ID3D11Buffer *>(m->indexData);
 
     UINT stride = sizeof(CustomVertexDX11);
     UINT offset = 0;
@@ -1115,11 +1175,50 @@ static HRESULT InitDirect3D(Window* win)
 
     HRESULT hr = S_OK;
 
-    //RECT rc;
-    //GetClientRect(win->backend->hwnd, &rc);
-    //UINT width = rc.right - rc.left;
-    //UINT height = rc.top - rc.bottom;
+    fprintf(stderr, "%s: Win handle hwnd: %p\n", __func__, win->backend->hwnd);
+    fprintf(stderr, "%s: window w: %d window h: %d\n", __func__, win->w, win->h);
 
+    /*
+    DXGI_SWAP_CHAIN_DESC sd = { 0 };
+    sd.BufferCount = 2;
+    //sd.BufferDesc.Width = win->w;
+    //sd.BufferDesc.Height = win->h;
+    sd.BufferDesc.RefreshRate.Numerator = 0;
+    sd.BufferDesc.RefreshRate.Denominator = 1;
+    sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM; 
+    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    // Turn multisampling off.
+    sd.SampleDesc.Count = 1;
+    sd.SampleDesc.Quality = 0;
+
+    sd.OutputWindow = win->backend->hwnd;
+    sd.Windowed = TRUE;
+
+    // Set the scanline ordering and scaling to be unspecified.
+    //sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+    //sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+
+    // Discard the backbuffer contents after presenting.
+    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+    UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+//#ifndef RELEASE 
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+//#endif 
+
+
+    // We get our features and device with swapchain.
+    // It creates the device, device (immediate) context, and swapchain.
+    D3D_FEATURE_LEVEL featureLevel;
+    hr = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE,
+            0, flags, NULL, 0, D3D11_SDK_VERSION,
+            &sd, &pSwapchain, &d3device, &featureLevel, &immediateContext);
+    if (FAILED(hr))
+    {
+        fprintf(stderr, "%s: Failed to create device and swapchain!\n", __func__);
+        return hr;
+    }
+    */
 
     hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void **) &dxgiFactory);
     if (FAILED(hr))
@@ -1182,7 +1281,7 @@ static HRESULT InitDirect3D(Window* win)
         }
     }
 
-    //fprintf(stderr, "%s: YOO win w:%d, win h:%d\n", __func__, win->w, win->h);
+    fprintf(stderr, "%s: YOO win w:%d, win h:%d\n", __func__, win->w, win->h);
     // Get the adapter (video card) description.
     DXGI_ADAPTER_DESC adapterDesc;
     hr = dxgiAdapter->GetDesc(&adapterDesc);
@@ -1221,11 +1320,6 @@ static HRESULT InitDirect3D(Window* win)
 
 
     // Then the swapchain.
-    HWND winHandle = *((HWND *) win->user);
-
-    fprintf(stderr, "%s: Win handle: %p\n", __func__, winHandle);
-    fprintf(stderr, "%s: window w: %d window h: %d\n", __func__, win->w, win->h);
-
     DXGI_SWAP_CHAIN_DESC sd;
     ZeroMemory(&sd, sizeof(sd));
     sd.BufferCount = 1;
@@ -1241,19 +1335,18 @@ static HRESULT InitDirect3D(Window* win)
     //    sd.BufferDesc.RefreshRate.Denominator = 1;
     //}
     sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = winHandle;
+    sd.OutputWindow = win->backend->hwnd;
     // Turn multisampling off.
     sd.SampleDesc.Count = 1;
     sd.SampleDesc.Quality = 0;
-    /*
+    fprintf(stderr, "hwnd: %p\n", win->backend->hwnd);
+
+#define FULLSCREEN 0
     if (FULLSCREEN) {
         sd.Windowed = FALSE;
     } else {
         sd.Windowed = TRUE;
     }
-    */
-    sd.Windowed = TRUE;
-
     // Set the scanline ordering and scaling to be unspecified.
     sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
     sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
@@ -1277,8 +1370,33 @@ static HRESULT InitDirect3D(Window* win)
     }
 
 
+    // Now try to debug this.
+    {
+        HRESULT reason = d3device->GetDeviceRemovedReason();
+        switch (reason)
+        {
+            case DXGI_ERROR_DEVICE_REMOVED:
+                puts("Graphics device removed!");
+                break;
+            case DXGI_ERROR_DEVICE_RESET:
+                puts("Graphics device reset!");
+                break;
+            case DXGI_ERROR_DEVICE_HUNG:
+                puts("Device hung!");
+                break;
+            case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
+                puts("Internal driver error!");
+                break;
+            default:
+                puts("No error found!");
+                break;
+        }
+    }
+
+
+
     // Create render target view.
-    hr = pSwapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID *) &framebuffer);
+    hr = pSwapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**> (&framebuffer));
     if (FAILED(hr))
     {
         fprintf(stderr, "%s: Couldn't get back buffer!\n", __func__);
@@ -1291,13 +1409,14 @@ static HRESULT InitDirect3D(Window* win)
     }
 
 
+    // TODO: The problem has to be some malformed buffers?
 
     // We reuse our descriptors.
     D3D11_BUFFER_DESC bufferDesc = { 0 };
     bufferDesc.ByteWidth = VERTEX_BUFFER_SIZE;
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // We write it using the CPU.
     hr = d3device->CreateBuffer(&bufferDesc, NULL, &streamVertexBuffer);
     if (FAILED(hr))
     {
@@ -1363,7 +1482,7 @@ static HRESULT InitDirect3D(Window* win)
     rasterizerDesc.CullMode = D3D11_CULL_BACK;
     d3device->CreateRasterizerState(&rasterizerDesc, &raster3D);
     rasterizerDesc.CullMode = D3D11_CULL_FRONT;
-    d3device->CreateRasterizerState(&rasterizerDesc, &raster3Dinvert);
+    d3device->CreateRasterizerState(&rasterizerDesc, &raster3DInvert);
 
 
     // Samplers.
@@ -1435,7 +1554,7 @@ static HRESULT InitDirect3D(Window* win)
         return -1;
     }
     depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-    hr = d3device->CreateDepthStencilState(&depthStencilDesc, &depthStencil3DnoWrite);
+    hr = d3device->CreateDepthStencilState(&depthStencilDesc, &depthStencil3DNoWrite);
     if (FAILED(hr))
     {
         fprintf(stderr, "%s: Failed to create depth stencil desc 3D no write!\n", __func__);
@@ -1454,6 +1573,8 @@ static HRESULT InitDirect3D(Window* win)
 
     surface2.color.flags |= TEXTURE_POINT;
 
+    puts("alright");
+
     return S_OK;
 }
 
@@ -1470,7 +1591,7 @@ static mat4 viewMat = mat4{1.0f};
 extern int GraphicsInit(Window* win)
 {
     // Create draw arena.
-    drawState.drawArena = ArenaInit(MB(4), KB(4), ARENA_FLAG_GROWABLE);
+    //drawState.drawArena = ArenaInit(MB(4), KB(4), ARENA_FLAG_GROWABLE);
 
     // Init graphics.
     if (FAILED(InitDirect3D(win)))
@@ -1515,7 +1636,7 @@ extern void GraphicsTerminate(void)
     DeleteTargetSurface(&surface2);
 
     depthStencil3D->Release();
-    depthStencil3DnoWrite->Release();
+    depthStencil3DNoWrite->Release();
     depthStencil2D->Release();
 
     for (int i = 0; i < BLEND_COUNT; ++i)
@@ -1529,7 +1650,7 @@ extern void GraphicsTerminate(void)
     pointSampler->Release();
     raster2D->Release();
     raster3D->Release();
-    raster3Dinvert->Release();
+    raster3DInvert->Release();
 
     // USER STUFF.
 
@@ -1622,6 +1743,8 @@ extern void GraphicsTerminate(void)
 
 extern void AllocateMutableTexture(int width, int height, void** args, int flags)
 {
+    // TODO: Soemthing.
+
     /*
     D3DFORMAT format = D3DFMT_X8R8G8B8;
     if (flags & TEXTURE_ALPHA)
@@ -1728,8 +1851,8 @@ extern GFX_texture* LoadImmutableTextureFromPixels(void* alloc, int w, int h, un
     GFX_texture* tex;
     if (alloc)
     {
-        ARENA* arena = reinterpret_cast<ARENA *>(alloc);
-        tex = ArenaPushStruct(arena, GFX_texture);
+        //ARENA* arena = reinterpret_cast<ARENA *>(alloc);
+        //tex = ArenaPushStruct(arena, GFX_texture);
     }
     else
     {

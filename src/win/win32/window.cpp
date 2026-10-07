@@ -1,11 +1,26 @@
 #include "../win.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+
+
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+#define _UNICODE
+
+//#include "platform.h"
+
+#include <fileapi.h>
+#include <windef.h>
+#include <windows.h>
+#include <winnt.h>
+#include <winuser.h>
+
+#include "../../platform/platform.h"
 
 //#include "../../platform/win32/platform.h"
 #include "../../base/base_log.h"
-
-#include "platform.h"
 
 #define WIN_CLASS_NAME L"CustomWindow"
 
@@ -35,7 +50,7 @@ static LRESULT CALLBACK MessageHandler(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
     PAINTSTRUCT ps;
     HDC hdc;
 
-    const wchar_t* string = L"8KB application that uses GDI calls (With no uCRT)";
+    const wchar_t* string = L"8KB application that uses GDI calls";
     */
 
     switch (umsg)
@@ -77,6 +92,7 @@ static LRESULT CALLBACK MessageHandler(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
                 input.mouseScrollY += delta / (float) WHEEL_DELTA;
             //}
         } break;
+
         /*
         case WM_PAINT:
         {
@@ -90,6 +106,7 @@ static LRESULT CALLBACK MessageHandler(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
             EndPaint(hwnd, &ps);
         } break;
         */
+
 
         case WM_SIZE:
         {
@@ -110,7 +127,7 @@ static LRESULT CALLBACK MessageHandler(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
 
         default:
         {
-            return DefWindowProcW(hwnd, umsg, wparam, lparam);
+            return DefWindowProc(hwnd, umsg, wparam, lparam);
         } break;
     }
 
@@ -146,14 +163,15 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT umessage, WPARAM wparam, LPARAM 
 }
 
 
-extern Window* WindowInit(ARENA* arena, const wchar_t* title, int width, int height)
+extern Window* WindowInit(const wchar_t* title, int width, int height)
 {
-    //PlatformInit();
-    LogInfo("Initializing window!");
+    PlatformInit();
+    LogInfo("Initializing window!\n");
 
     if (!windowInitialized)
     {
         windowInitialized = RegisterWinClass();
+        puts("Init window class!");
     }
 
     if (!windowInitialized)
@@ -164,19 +182,22 @@ extern Window* WindowInit(ARENA* arena, const wchar_t* title, int width, int hei
         return NULL;
     }
 
-    ARENA_TEMP arenaTemp = ArenaTempBegin(arena);
+    //ARENA_TEMP arenaTemp = ArenaTempBegin(arena);
 
 
-    Window* win = ArenaPushStruct(arenaTemp.arena, Window);
-    //Window* win = (Window *) _MALLOC(sizeof(Window));
-    win->title = title;
+    //Window* win = ArenaPushStruct(arenaTemp.arena, Window);
+    Window* win = (Window *) _MALLOC(sizeof(Window));
+    _MEMSET(win, 0, sizeof(Window));
+
+    win->title = static_cast<const wchar_t *> (title);
     win->w = width;
     win->h = height;
     win->flags = 0;
 
-    win->backend = ArenaPushStruct(arenaTemp.arena, WinBackend);
-    //win->backend = (WinBackend *) _MALLOC(sizeof(WinBackend));
-    //_MEMSET(win->backend, 0, sizeof(WinBackend));
+
+    //win->backend = ArenaPushStruct(arenaTemp.arena, WinBackend);
+    win->backend = (WinBackend *) _MALLOC(sizeof(WinBackend));
+    _MEMSET(win->backend, 0, sizeof(WinBackend));
 
     RECT winRect = { 0, 0, (int) width, (int) height };
     if (!AdjustWindowRect(&winRect, WS_OVERLAPPEDWINDOW, FALSE))
@@ -188,7 +209,7 @@ extern Window* WindowInit(ARENA* arena, const wchar_t* title, int width, int hei
 
     win->backend->hwnd = CreateWindowW(
         WIN_CLASS_NAME,
-        win->title, WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_POPUP | WS_OVERLAPPEDWINDOW,
+        win->title, WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_POPUP | WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         winRect.right - winRect.left, winRect.bottom - winRect.top,
         NULL, NULL, NULL, NULL
@@ -202,7 +223,7 @@ extern Window* WindowInit(ARENA* arena, const wchar_t* title, int width, int hei
 
     // We add the user data, i.e. the window handle that
     // can be accessed within other parts of the code.
-    win->user = &win->backend->hwnd;
+    win->user = win->backend->hwnd;
 
     SetWindowLongPtrW(win->backend->hwnd, GWLP_USERDATA, (LONG_PTR) win);
 
@@ -228,45 +249,15 @@ extern Window* WindowInit(ARENA* arena, const wchar_t* title, int width, int hei
 
     //ArenaTempEnd(arenaTemp);
 
-
     return win;
-
 
 fail:
     if (win->backend->hwnd != NULL)
     {
         DestroyWindow(win->backend->hwnd);
     }
-    ArenaTempEnd(arenaTemp);
+    //ArenaTempEnd(arenaTemp);
     return NULL;
-
-
-    // TODO: implement things.
-
-    /*
-    Window* win = ArenaPushStruct(w32Arena, Window);
-    win->backend = ArenaPushStruct(w32Arena, WinBackend);
-
-    win->backend->hwnd = CreateWindow(
-        "Engine Window",
-        "Engine Window",
-        WS_OVERLAPPEDWINDOW,
-        20, // Starting X.
-        20, // Starting Y.
-        640, 480,
-        NULL, NULL, hinstance, NULL
-    );
-
-    if (!hwnd)
-    {
-        return NULL;
-    }
-
-    ShowWindow(hwnd, nCmdShow);
-    UpdateWindow(hwnd);
-
-    return window;
-    */
 }
 
 extern void WindowTerminate(Window* win)
@@ -288,7 +279,7 @@ extern void WindowTerminate(Window* win)
     DestroyWindow(win->backend->hwnd);
     win->backend->hwnd = NULL;
 
-    UnregisterClassW(win->title, win->backend->hinstance);
+    UnregisterClass(win->title, win->backend->hinstance);
     win->backend->hinstance = NULL;
 
     // Remove backend.
@@ -308,7 +299,7 @@ extern void WindowProcessEvents(Window* win)
     while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
     {
         TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        DispatchMessageW(&msg);
     }
 }
 
@@ -425,7 +416,7 @@ static int RegisterWinClass(void)
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH) (COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
-    wc.lpszClassName = "CustomWindow";
+    wc.lpszClassName = WIN_CLASS_NAME;
     wc.cbSize = sizeof(WNDCLASSEX);
 
     ATOM atom = RegisterClassEx(&wc);

@@ -249,6 +249,7 @@ extern void DrawRectBillboard(f32 w, f32 h)
 
 extern void DrawEllipse(int npoints, f32 w, f32 h)
 {
+    /*
     // Stack memory.
     float* col[2];
     switch (drawState.colorMode)
@@ -293,10 +294,12 @@ extern void DrawEllipse(int npoints, f32 w, f32 h)
     DrawIndices(npoints + 1, npoints * 3, indices);
 
     ArenaTempEnd(tmp);
+    */
 }
 
 extern void DrawArcSector(int npoints, f32 rStart, f32 r, f32 w1, f32 w2)
 {
+    /*
     if (npoints < 2)
     {
         return;
@@ -357,11 +360,13 @@ extern void DrawArcSector(int npoints, f32 rStart, f32 r, f32 w1, f32 w2)
 
     DrawIndices(npoints * 2, npoints1 * 6, indices);
     ArenaTempEnd(arenaTemp);
+    */
 }
 
 
 extern void DrawFillStar(int npoints, f32 r1, f32 r2)
 {
+    /*
     // Stack memory.
     float* col[2];
     switch (drawState.colorMode)
@@ -423,6 +428,7 @@ extern void DrawFillStar(int npoints, f32 r1, f32 r2)
     DrawIndices(npoints + 1, npoints * 3, indices);
 
     ArenaTempEnd(tmp);
+    */
 }
 extern void DrawLineStar(int npoints, f32 r1, f32 r2, f32 thickness)
 {

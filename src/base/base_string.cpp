@@ -79,8 +79,9 @@ extern void Str8_memcpy(String8* dest, const String8* src, u64 offset)
     memcpy(dest->data + offset, src->data, size);
 }
 
-extern String8 Str8_copy(ARENA* arena, String8 src)
+extern String8 Str8_copy(void* alloc, String8 src)
 {
+    ARENA* arena = static_cast<ARENA *>(alloc);
     String8 out;
     out.data = ArenaPushArrayNZ(arena, u8, src.len);
     out.len = src.len;
@@ -91,8 +92,10 @@ extern String8 Str8_copy(ARENA* arena, String8 src)
 }
 
 // Push format variadic argument.
-extern String8 Str8_pushfv(ARENA* arena, const char* fmt, va_list args)
+extern String8 Str8_pushfv(void* alloc, const char* fmt, va_list args)
 {
+    ARENA* arena = static_cast<ARENA *>(alloc);
+
     String8 out = { 0 };
 
     va_list args2;
@@ -121,7 +124,7 @@ extern String8 Str8_pushfv(ARENA* arena, const char* fmt, va_list args)
     return out;
 }
 
-extern String8 Str8_pushf(ARENA* arena, const char* fmt, ...)
+extern String8 Str8_pushf(void* arena, const char* fmt, ...)
 {
     va_list args;
 
@@ -221,10 +224,11 @@ extern u32 StrEncodeUTF16(u16* dst, u32 codePoint)
    Windows uses UTF-16 for wchar_t.
 */
 
-extern String16 Str16FromStr8(ARENA* arena, String8 base, b32 nullTerminate)
+extern String16 Str16FromStr8(void* alloc, String8 base, b32 nullTerminate)
 {
     u64 maxSize = base.len + (nullTerminate ? 1 : 0);
 
+    ARENA* arena = static_cast<ARENA *>(alloc);
     u16* out = (u16 *) ArenaPush(arena, sizeof(u16) * maxSize, 0);
 
     u64 outSize = 0;

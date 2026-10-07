@@ -2,7 +2,7 @@
 #define WIN_H_ 1
 
 #include "../base/base_defs.h"
-#include "../mem/arena.h"
+//#include "../mem/arena.h"
 
 
 #define MOUSE_LEFT (0)
@@ -28,19 +28,18 @@ typedef struct Input {
 typedef struct Window {
     const wchar_t* title;
 
+    u32 w, h;
+    u32 flags;
+
     WinBackend* backend;
     void* user;
-
-    u32 w, h;
-
-    u32 flags;
 } Window;
 
 extern Window* windowHandle;
 extern Input input;
 
 
-extern Window* WindowInit(ARENA* arena, const wchar_t* title, int width, int height);
+extern Window* WindowInit(const wchar_t* title, int width, int height);
 extern void WindowTerminate(Window* win);
 
 extern void WindowProcessEvents(Window* win);

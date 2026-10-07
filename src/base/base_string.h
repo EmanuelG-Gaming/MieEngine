@@ -2,7 +2,7 @@
 #define BASE_STRING_H_ 1
 
 #include "base_defs.h"
-#include "../mem/arena.h"
+//#include "../mem/arena.h"
 
 
 
@@ -54,10 +54,10 @@ extern String8 Str8_fromCstr(u8* cstr);
 
 
 extern void Str8_memcpy(String8* dest, const String8* src, u64 offset);
-extern String8 Str8_copy(ARENA* arena, String8 src);
+extern String8 Str8_copy(void* arena, String8 src);
 
-extern String8 Str8_pushfv(ARENA* arena, const char* fmt, va_list args);
-extern String8 Str8_pushf(ARENA* arena, const char* fmt, ...);
+extern String8 Str8_pushfv(void* arena, const char* fmt, va_list args);
+extern String8 Str8_pushf(void* arena, const char* fmt, ...);
 
 /*
    String encoding utilities.
@@ -65,6 +65,6 @@ extern String8 Str8_pushf(ARENA* arena, const char* fmt, ...);
 
 extern StringDecode StrDecodeUTF8(String8 str, u64 offset);
 extern u32 StrEncodeUTF16(u16 *dst, u32 codePoint);
-extern String16 Str16FromStr8(ARENA* arena, String8 base, b32 nullTerminate);
+extern String16 Str16FromStr8(void* arena, String8 base, b32 nullTerminate);
 
 #endif /* BASE_STRING_H_ */

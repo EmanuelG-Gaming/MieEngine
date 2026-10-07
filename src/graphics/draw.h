@@ -173,6 +173,16 @@ typedef struct CustomVertexDX11 {
 
 typedef struct GFX_shader GFX_shader;
 
+typedef struct GFX_light {
+    float x, y, z;
+    float ambR, ambG, ambB;
+    float difR, difG, difB;
+    float spcR, spcG, spcB;
+
+    float constant, linear, quadratic;
+    float intensity;
+} GFX_light;
+
 typedef struct DrawPass {
     b32 active;
     /*
@@ -200,6 +210,9 @@ typedef struct DrawPass {
     u32 fogColor;
     float fogMin, fogMax;
 
+    GFX_light* dirLight;
+    GFX_light* pointLights;
+
     int target;
 
     uint32_t flags;
@@ -210,7 +223,7 @@ typedef struct DrawPass {
 } DrawPass;
 
 typedef struct DRAWSTATE {
-    ARENA* drawArena;
+    //ARENA* drawArena;
 
     mat4 matStack[16];
     int matStackIdx;

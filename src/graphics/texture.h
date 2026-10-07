@@ -1,7 +1,7 @@
 #ifndef TEXTURE_H_
 #define TEXTURE_H_ 1
 
-#include "../mem/arena.h"
+//#include "../mem/arena.h"
 
 #define TEXTURE_POINT 1
 #define TEXTURE_SRGB 2
