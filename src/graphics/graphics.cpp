@@ -14,7 +14,7 @@
 #if defined(GFX_USE_DX9)
 #include "dx9/graphics.cpp"
 #elif defined(GFX_USE_DX11)
-#include "dx11/graphics.cpp"
+#include "dx11/new-graphics.cpp"
 #elif defined(GFX_USE_OPENGL)
 #include "opengl/graphics.cpp"
 #endif

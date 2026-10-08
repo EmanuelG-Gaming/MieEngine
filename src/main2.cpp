@@ -1,3 +1,4 @@
+#include "graphics/texture.h"
 #define UNICODE
 #define _UNICODE
 #define NOMINMAX
@@ -13,8 +14,22 @@
 #include "base/base_log.cpp"
 #include "graphics/draw.cpp"
 #include "platform/platform.cpp"
+#include "graphics/texture.cpp"
+#include "io/asset.cpp"
 
 #include "../ext/arena.cpp"
+#include "../ext/lzss.cpp"
+
+
+GFX_texture* Load2x2PixelSquare(void)
+{
+    u32 pix[4] = {
+        0xffffffff, 0xffffffff,
+        0xffffffff, 0xffffffff,
+    };
+
+    return LoadImmutableTextureFromPixels(NULL, 2, 2, reinterpret_cast<unsigned char *>(pix), 0);
+}
 
 
 
@@ -33,6 +48,9 @@ int ExampleTesting(void)
     //    FastPrint(res);
     }
 
+    GFX_texture* texSquare = Load2x2PixelSquare();
+
+
     int t = 1;
     while (WindowOpened(window))
     {
@@ -46,11 +64,18 @@ int ExampleTesting(void)
 
         DrawBegin();
 
-        DrawColor(0, 0, 0, 1.0);
-        DrawColor2(0, 0, 0, 0);
+        // I found out why that problem happens on DX11:
+        // You have to use the shader so that
+        // the graphics library would not report DXGI_ERROR_DEVICE_REMOVED.
+
+        ShaderUse(defaultShader);
+        DrawTexture(0, texSquare);
+
+        DrawColor(1, 1, 1, 1.0);
+        DrawColor2(1, 1, 1, 0.0);
         DrawColorMode(COLOR_LR);
 
-        DrawRect(0.1, 0.1);
+        DrawRect(0.5, 0.5);
         //DrawMatTranslate3D(0.1f, 0.5f, 0.0f);
 
         /*

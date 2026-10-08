@@ -244,7 +244,7 @@ int WindowTesting(void)
 
     // More bytes neeeded.
     ARENA* arena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
-    Window* window = WindowInit(arena, L"Testing window", 640*1.5, 480*1.5);
+    Window* window = WindowInit(L"Testing window", 640*1.5, 480*1.5);
 
     // Create graphics.
     GraphicsInit(window);
@@ -460,7 +460,13 @@ int WindowTesting(void)
         DrawClear(0x001155);
         //DrawClear(0xffff00);
 
+        DrawReset();
+        DrawSetTarget();
+
         DrawBegin();
+        ShaderUse(defaultShader);
+        DrawTexture(0, pixSquare);
+
  
         if (1) {
             // 1st pass.
@@ -570,7 +576,7 @@ int WindowTesting(void)
                 float vmy = vm.entityPos.y;
 
                 RNG_seed(0, 2);
-                for (int i = 0; i < 1000; ++i)
+                for (int i = 0; i < 10000; ++i)
                 {
                     float randAngle = RNG_randf32_range(0, PI2);
                     float randLength = RNG_randf32_range(0.01f, 2.0f);
@@ -875,7 +881,7 @@ int ExampleTesting(void)
     //PlatformInit();
 
     ARENA* arena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
-    Window* window = WindowInit(arena, L"Example window", 640, 480);
+    Window* window = WindowInit(L"Example window", 640, 480);
     GraphicsInit(window);
 
     {
@@ -895,7 +901,7 @@ int ExampleTesting(void)
         0, 1, 2,
     };
 
-    GFX_mesh* mesh = DrawUploadMesh(arena, vertexData, indices, 3);
+    //GFX_mesh* mesh = DrawUploadMesh(arena, vertexData, indices, 3);
 
     int t = 1;
     while (WindowOpened(window))
@@ -953,8 +959,8 @@ int ExampleTesting(void)
 int main()
 {
     //LogTesting();
-    ExampleTesting();
-    //WindowTesting();
+    //ExampleTesting();
+    WindowTesting();
 
     return 0;
 }

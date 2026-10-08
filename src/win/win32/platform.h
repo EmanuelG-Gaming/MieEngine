@@ -12,7 +12,7 @@
 #define _UNICODE
 
 #include <windows.h>
-//#include <minwinbase.h>
+#include <minwinbase.h>
 
 //#include <d3d11.h>
 //#include <d3dcompiler.h>

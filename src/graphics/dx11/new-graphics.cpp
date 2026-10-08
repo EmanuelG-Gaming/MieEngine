@@ -1,20 +1,38 @@
-#include "../draw.h"
-#include "../../base/base_log.h"
-#include "../../win/win.h"
+#include "../../base/base_defs.h"
+#include "../../base/math/mathf.h"
 
-#include <stddef.h>
+//#include "draw3d.h"
+//#include "model.h"
+//#include "texture.h"
+//#include "font.h"
+
+#include "../draw.h"
+
+
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "../../win/win32/window.cpp"
 
 #include <d3d11.h>
-
-/*
-   TODO: Use shader bytecode directly?
-*/
 #include <d3dcompiler.h>
 
+// Ok.
+//#define FULLSCREEN 0
+//#define VSYNC_ENABLED 1
+#define SCREEN_DEPTH (1000.0f)
+#define SCREEN_NEAR (0.3f)
 
+
+#if defined(UNICODE) || defined(_UNICODE)
+#define WIN_HAS_UNICODE 1
+#endif
+
+#ifdef WIN_HAS_UNICODE
+#define UNICODE_CAST(str) (const wchar_t *) str
+#else
+#define UNICODE_CAST(str) (const char_t *) str
+#endif
 
 // Multiline string.
 #define D3D_HLSL_DECL(...) #__VA_ARGS__
@@ -133,7 +151,8 @@ static const char* color_ps = D3D_HLSL_DECL(
     }
 );
 
-#ifdef RELEASE
+
+#ifdef RELEASE 
 #define VBO_MAX_SIZE 0x4000
 #define EBO_MAX_SIZE 0x4000
 #else
@@ -141,31 +160,32 @@ static const char* color_ps = D3D_HLSL_DECL(
 #define EBO_MAX_SIZE 0x8000
 #endif
 
-#ifdef RELEASE
-#define VERTEX_BUFFER_SIZE 0x4000
+
+#ifdef RELEASE 
+#define VERTEX_BUFFER_sIZE 0x4000
 #define INDEX_BUFFER_SIZE 0x4000
 #else
 #define VERTEX_BUFFER_SIZE 0x8000
 #define INDEX_BUFFER_SIZE 0x8000
 #endif
 
-
 /*
-   DirectX constant buffers.
+   DirectX Constant buffers.
 */
 
-typedef struct ConstantVS {
+
+typedef struct CONSTANT_VS {
     mat4 modelView;
     mat4 projection;
     mat4 normMat;
-} ConstantVS;
+} CONSTANT_VS;
 
-typedef struct ConstantPsTex {
+typedef struct CONSTANT_PSTEX {
     float offs[2];
     float scale[2];
-} ConstantPsTex;
+} CONSTANT_PSTEX;
 
-typedef struct ConstantPsLight {
+typedef struct CONSTANT_PSLIGHT {
     float position[4];
     float ambient[4];
     float diffuse[4];
@@ -175,96 +195,34 @@ typedef struct ConstantPsLight {
     float linear;
     float quadratic;
     float intensity;
-} ConstantPsLight;
+} CONSTANT_PSLIGHT;
 
-typedef struct ConstantPsScene {
-    ConstantPsLight dirLight;
-    ConstantPsLight pointLights[8];
+typedef struct CONSTANT_PSSCENE {
+    CONSTANT_PSLIGHT dirLight;
+    CONSTANT_PSLIGHT pointLights[8];
 
     float fogMin, fogMax;
     int unused[2]; // Alignment.
     float fogColor[4];
-} ConstantPsScene;
+} CONSTANT_PSSCENE;
 
-typedef struct ConstantPS {
-    ConstantPsTex tex[8];
-} ConstantPS;
-
-
-
+typedef struct CONSTANT_PS {
+    CONSTANT_PSTEX tex[8];
+} CONSTANT_PS;
 
 
 /*
-   Render state.
+   Global state.
 */
-/*
-static int currNverts;
-static int currNindices;
-
 DRAWSTATE drawState;
+//LIGHT dirLight;
+//LIGHT PointLights[8];
+//CAMERA3D camera3Handle;
 
-static mat4 identMat { 1.0f };
+uint32_t fogColor;
+float fogMin, fogMax;
 
-// Direct3D variables.
-static ID3D11Device* d3device = NULL;
-static ID3D11DeviceContext* immediateContext = NULL;
-static IDXGISwapChain* pSwapchain = NULL;
-
-// Sampler states.
-static ID3D11SamplerState* linearSampler = NULL;
-static ID3D11SamplerState* pointSampler = NULL;
-// Raster states.
-static ID3D11RasterizerState* raster2D = NULL;
-static ID3D11RasterizerState* raster3D = NULL;
-static ID3D11RasterizerState* raster3Dinvert = NULL;
-// Depth stencils.
-static ID3D11DepthStencilState* depthStencil3D = NULL;
-static ID3D11DepthStencilState* depthStencil3DnoWrite = NULL;
-static ID3D11DepthStencilState* depthStencil2D = NULL;
-// Blending modes.
-static ID3D11BlendState* blendStates[BLEND_COUNT];
-
-
-
-// Vertex and index buffer.
-static ID3D11Buffer* streamVertexBuffer = NULL;
-static ID3D11Buffer* streamIndexBuffer = NULL;
-static D3D11_MAPPED_SUBRESOURCE streamVertexMappedBuffer;
-static D3D11_MAPPED_SUBRESOURCE streamIndexMappedBuffer;
-
-// Constant buffers.
-static ID3D11Buffer* constantVSBuffer = NULL;
-static ID3D11Buffer* constantPSBuffer = NULL;
-static ID3D11Buffer* constantPSSceneBuffer = NULL;
-
-
-// DXGI (are these really necessary)?
-static IDXGIFactory* dxgiFactory = NULL;
-static IDXGIAdapter* dxgiAdapter = NULL;
-static IDXGIOutput* adapterOutput = NULL;
-static char videoCardDescription[128];
-
-
-static D3D11_VIEWPORT viewport;
-
-typedef struct TargetSurface {
-    GFX_texture color;
-    GFX_texture depthStencil;
-
-    ID3D11RenderTargetView* colorView;
-    ID3D11DepthStencilView* depthStencilView;
-} TargetSurface;
-static TargetSurface surface1;
-static TargetSurface surface2;
-
-// The 3rd target surface (the one needed to be shown to the screen).
-static ID3D11Texture2D* framebuffer = NULL;
-static ID3D11RenderTargetView* framebufferView = NULL;
-*/
-
-DRAWSTATE drawState;
-
-static mat4 identMat { 1.0f };
+static mat4 identMat{1.0f};
 
 /*
    Direct3D variables.
@@ -309,45 +267,150 @@ static char videoCardDescription[128];
 
 static D3D11_VIEWPORT viewport;
 
-typedef struct TargetSurface {
+typedef struct TARGETSURFACE {
     GFX_texture color;
     GFX_texture depthStencil;
     ID3D11RenderTargetView* colorView;
     ID3D11DepthStencilView* depthStencilView;
-} TargetSurface;
+} TARGETSURFACE;
 
-static TargetSurface surface1;
-static TargetSurface surface2;
+static TARGETSURFACE surface1;
+static TARGETSURFACE surface2;
 static ID3D11Texture2D* framebuffer = NULL;
 static ID3D11RenderTargetView* framebufferView = NULL;
+
+
+/*
+   Custom things.
+*/
+//static MESH utahTeapot;
+typedef struct SHADER SHADER;
+static SHADER* defaultShader = NULL;
+
+//static FONT* defaultFont = NULL;
+//static TEXTURE* fontTexture = NULL;
+//static TEXTURE* defaultSquareTexture = NULL;
+
+
+
+// Timing.
+//#define DTIME 20
+
+//static u64 startedTime = 0;
+//static u64 deltaTimeU = 0;
+
+
+typedef enum SHADERLAYOUT {
+    SHADER_LAYOUT_NONE = 0,
+    SHADER_LAYOUT_FLATCOLOR,
+    SHADER_LAYOUT_BASIC_SHADED,
+    SHADER_LAYOUT_SKINNED_ANIMATION,
+} SHADERLAYOUT;
+
+typedef struct VERTEXSHADER {
+    ID3D11VertexShader* vs;
+    ID3D11InputLayout* inputLayout;
+
+    VERTEXSHADER() : vs(NULL), inputLayout(NULL) {}
+    VERTEXSHADER(ID3D11VertexShader* vs, ID3D11InputLayout* layout) : vs(vs), inputLayout(layout) {}
+} VERTEXSHADER;
+
+typedef struct SHADER {
+    VERTEXSHADER vertexShader;
+    ID3D11PixelShader* pixelShader;
+} SHADER;
 
 
 
 
 /*
-   Shader pipeline loader.
+   Static functions.
 */
-typedef enum ShaderLayout {
-    SHADER_LAYOUT_NONE = 0,
-    SHADER_LAYOUT_FLATCOLOR,
-    SHADER_LAYOUT_BASIC_SHADED,
-    SHADER_LAYOUT_SKINNED_ANIMATION,
-} ShaderLayout;
 
-typedef struct VertexShader {
-    ID3D11VertexShader* vs;
-    ID3D11InputLayout* inputLayout;
+// Load global vertex buffer.
+/*
+static int LoadVertexBuffer(float* vertexData, size_t bytecount)
+{
+    D3D11_BUFFER_DESC bd;
+    ZeroMemory(&bd, sizeof(bd));
+    bd.Usage = D3D11_USAGE_DYNAMIC; // Dynamic buffer WOOOO
+    bd.ByteWidth = bytecount;
+    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    if (FAILED(d3device->CreateBuffer(&bd, NULL, &vertexBuffer))) {
+        fprintf(stderr, "%s: Failed to create buffer!\n", __func__);
+        return -1;
+    }
 
-    VertexShader() : vs(NULL), inputLayout(NULL) {}
-    VertexShader(ID3D11VertexShader* vs, ID3D11InputLayout* layout) : vs(vs), inputLayout(layout) {}
-} VertexShader;
+    // Now we copy vertex data into vertex buffer.
+    D3D11_MAPPED_SUBRESOURCE ms;
+    immediateContext->Map((ID3D11Resource *) vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);
+    _MEMCPY(ms.pData, vertexData, bytecount);
+    immediateContext->Unmap((ID3D11Resource *) vertexBuffer, 0);
 
-typedef struct Shader {
-    VertexShader vertexShader;
-    ID3D11PixelShader* pixelShader;
-} Shader;
+    return 0;
+}
+// Load global vertex buffer.
+static int LoadUtahVertexBuffer(vertex_t* vertexData, size_t bytecount)
+{
+    D3D11_BUFFER_DESC bd;
+    ZeroMemory(&bd, sizeof(bd));
+    bd.Usage = D3D11_USAGE_DYNAMIC; // Dynamic buffer WOOOO
+    bd.ByteWidth = bytecount;
+    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    if (FAILED(d3device->CreateBuffer(&bd, NULL, &vertexBuffer))) {
+        fprintf(stderr, "%s: Failed to create buffer!\n", __func__);
+        return -1;
+    }
 
-static Shader* defaultShader = NULL;
+    // Now we copy vertex data into vertex buffer.
+    D3D11_MAPPED_SUBRESOURCE ms;
+    immediateContext->Map((ID3D11Resource *) vertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);
+    _MEMCPY(ms.pData, vertexData, bytecount);
+    immediateContext->Unmap((ID3D11Resource *) vertexBuffer, 0);
+
+    fprintf(stderr, "%s: sucks\n", __func__);
+
+    return 0;
+}
+*/
+
+// Constant buffer.
+/*
+static int LoadMatrixBuffer(void)
+{
+    D3D11_BUFFER_DESC mbd;
+    ZeroMemory(&mbd, sizeof(mbd));
+    mbd.Usage = D3D11_USAGE_DYNAMIC;
+    mbd.ByteWidth = sizeof(mat4) * 3; // We use 3 matrices.
+    mbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    mbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    if (FAILED(d3device->CreateBuffer(&mbd, NULL, &matrixBuffer))) {
+        fprintf(stderr, "%s: Failed to create matrix buffer!\n", __func__);
+        return -1;
+    }
+
+    return 0;
+}
+
+// Constant buffer for lights.
+static int LoadSceneBuffer(void)
+{
+    D3D11_BUFFER_DESC bd;
+    ZeroMemory(&bd, sizeof(bd));
+    bd.Usage = D3D11_USAGE_DYNAMIC;
+    bd.ByteWidth = sizeof(CONSTANT_PSSCENE);
+    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    if (FAILED(d3device->CreateBuffer(&bd, NULL, &sceneBuffer))) {
+        fprintf(stderr, "%s: Failed to create scene buffer!\n", __func__);
+        return -1;
+    }
+
+    return 0;
+}
+*/
 
 
 static int HandleErrorShader(ID3D10Blob* errorBlob)
@@ -355,19 +418,20 @@ static int HandleErrorShader(ID3D10Blob* errorBlob)
     if (errorBlob)
     {
         fprintf(stderr,
-                "Shader compilation failed!\n"
-                "==========================\n"
-                "%s"
-                "==========================\n",
-                reinterpret_cast<char *> (errorBlob->GetBufferPointer()));
+            "\nShader compilation failed! [error]:\n"
+            "========================\n"
+            "%s"
+            "========================\n",
+            (char *) (errorBlob->GetBufferPointer()));
         return 0;
     }
 
     return -1;
 }
 
-static Shader* ShaderLoad(ShaderLayout format, const char* vs, const char* fs)
+static SHADER* ShaderLoad(SHADERLAYOUT format, const char* vs, const char* fs)
 {
+    // NOTE: So the basic idea is to combine these vs and fs
     // source code into one large string.
     char buf[4096];
     snprintf(buf, 2048, "%s %s", vs, fs);
@@ -398,7 +462,7 @@ static Shader* ShaderLoad(ShaderLayout format, const char* vs, const char* fs)
     // Create shaders.
     //ID3D11VertexShader* vertexShader;
     //ID3D11PixelShader* pixelShader;
-    Shader* shd = new Shader;
+    SHADER* shd = (SHADER *) _MALLOC(sizeof(SHADER));
 
     // Then compile the shaders.
     d3device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), NULL, &shd->vertexShader.vs);
@@ -441,7 +505,6 @@ static Shader* ShaderLoad(ShaderLayout format, const char* vs, const char* fs)
         d3device->CreateInputLayout(layout, 4, vertexShaderBlob->GetBufferPointer(),
             vertexShaderBlob->GetBufferSize(), &shd->vertexShader.inputLayout);
 
-        puts("Loaded shader!");
     }
     else
     {
@@ -453,18 +516,16 @@ static Shader* ShaderLoad(ShaderLayout format, const char* vs, const char* fs)
     //immediateContext->IASetInputLayout(shd->vertexShader.inputLayout);
 
     return shd;
-
 }
 
-static void ShaderTerminate(Shader* shader)
+static void ShaderTerminate(SHADER* shader)
 {
     if (shader)
     {
-        delete shader;
+        _FREE(shader);
     }
 }
-
-static int ShaderUse(Shader* shader)
+static int ShaderUse(SHADER* shader)
 {
     if (shader)
     {
@@ -472,6 +533,8 @@ static int ShaderUse(Shader* shader)
 
         immediateContext->VSSetShader(shader->vertexShader.vs, NULL, 0);
         immediateContext->PSSetShader(shader->pixelShader, NULL, 0);
+
+        return 0;
     }
     return -1;
 }
@@ -483,11 +546,7 @@ static void DoGamma(float* r, float* g, float* b)
     *b = 0.75f * (*b * *b) + 0.25f * *b * (*b * *b);
 }
 
-/*
-   ...along with the shader uniform constants.
-*/
-
-static void CopyLight(DrawPass* pass, ConstantPsLight* dest, GFX_light* l, b32 pointSource)
+static void CopyLight(DrawPass* pass, CONSTANT_PSLIGHT* dest, GFX_light* l, b32 pointSource)
 {
     if (pointSource)
     {
@@ -526,7 +585,6 @@ static void CopyLight(DrawPass* pass, ConstantPsLight* dest, GFX_light* l, b32 p
     dest->intensity = l->intensity;
 }
 
-
 static void SetNormalMat(void)
 {
     drawState.normalMat = drawState.matStack[drawState.matStackIdx];
@@ -542,14 +600,12 @@ static void SetScenePSConstants(void)
     D3D11_MAPPED_SUBRESOURCE mappedBuffer;
     immediateContext->Map(constantPSSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBuffer);
 
-    ConstantPsScene* scene = (ConstantPsScene *) mappedBuffer.pData;
-
+    CONSTANT_PSSCENE* scene = (CONSTANT_PSSCENE *) mappedBuffer.pData;
     // Copy the lights.
     CopyLight(pass, &scene->dirLight, pass->dirLight, FALSE);
     for (int i = 0; i < DRAW_MAX_POINTLIGHTS; ++i) {
         CopyLight(pass, &scene->pointLights[i], &pass->pointLights[i], TRUE);
     }
-
     // Fog.
     float fog[3] = {
         ((fogColor >> 16) & 0xFF) / 255.0f,
@@ -574,7 +630,7 @@ static void Draw_SetConstants(mat4* model)
     D3D11_MAPPED_SUBRESOURCE matRes;
     immediateContext->Map(constantVSBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &matRes);
 
-    ConstantVS* mats = (ConstantVS *) (matRes.pData);
+    CONSTANT_VS* mats = (CONSTANT_VS *) (matRes.pData);
 
     // Fill modelview.
     if (model)
@@ -610,7 +666,7 @@ static void Draw_SetConstants(mat4* model)
     D3D11_MAPPED_SUBRESOURCE mappedPS;
     immediateContext->Map(constantPSBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedPS);
 
-    ConstantPS* ps = (ConstantPS *) (mappedPS.pData);
+    CONSTANT_PS* ps = (CONSTANT_PS *) (mappedPS.pData);
     for (int i = 0; i < DRAW_MAX_TEX; ++i)
     {
         ps->tex[i].offs[0] = drawState.tex[i].x;
@@ -641,7 +697,6 @@ static void Draw_SetConstants(mat4* model)
         immediateContext->PSSetSamplers(0, 1, &linearSampler);
     }
 
-
     // Then link the constant buffers.
     immediateContext->VSSetConstantBuffers(0, 1, &constantVSBuffer);
     if (pass->flags & DRAW_PASS_FLAG_SCENE_CONSTANTS)
@@ -655,6 +710,7 @@ static void Draw_SetConstants(mat4* model)
         //fprintf(stderr, "%s: Ok bro\n", __func__);
     }
 }
+
 
 
 static void DrawPrepare(void)
@@ -684,7 +740,6 @@ extern void DrawFlush(void)
 
         UINT stride = sizeof(CustomVertexDX11);
         UINT offset = 0;
-
 
         // TODO: bruhh this has to be the issue.
         immediateContext->IASetVertexBuffers(0, 1, &streamVertexBuffer, &stride, &offset);
@@ -770,7 +825,7 @@ extern void DrawIndices(int verts, int n, unsigned int const* st)
     int base = currNverts - verts;
     for (int i = 0; i < n; ++i)
     {
-        (static_cast<int *> (streamIndexMappedBuffer.pData))[currNindices++] = base + st[i];
+        ((int *) (streamIndexMappedBuffer.pData))[currNindices++] = base + st[i];
     }
 }
 
@@ -850,6 +905,7 @@ extern void DrawBlend(BlendMode blend)
 {
     if (drawState.blend != blend)
     {
+        // The issue is at draw flush.
         DrawFlush();
         drawState.blend = blend;
 
@@ -920,7 +976,7 @@ extern void DrawClear(uint32_t color)
     }
 
 
-    TargetSurface* target = NULL;
+    TARGETSURFACE* target = NULL;
     if (drawState.passes[drawState.currentPass].target == 0)
     {
         target = &surface1;
@@ -998,23 +1054,17 @@ extern void DrawSetTarget(void)
 }
 
 // Uploads immutable data.
-extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* verts, void* indices, int nVertices)
+extern GFX_mesh* DrawUploadMesh(void* alloc, void* verts, void* indices, int nVertices)
 {
-    // TODO: Might be an issue.
-    //GFX_mesh* m = ArenaPushStruct(arena, GFX_mesh);
-    GFX_mesh* m = new GFX_mesh;
-    m->nElements = nVertices / 3;
-
-
+    puts("TODO: Implement DrawUploadMesh");
+    /*
     size_t vertexSize = sizeof(CustomVertexDX11);
 
     D3D11_BUFFER_DESC bd;
     ZeroMemory(&bd, sizeof(bd));
     bd.Usage = D3D11_USAGE_IMMUTABLE;
-    bd.ByteWidth = vertexSize * nVertices;
+    bd.ByteWidth = vertexSize * m->nvertices;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-
-    fprintf(stderr, "%s: buffer descriptor byte width: %d\n", __func__, bd.ByteWidth);
 
     D3D11_SUBRESOURCE_DATA subres;
     subres.pSysMem = verts;
@@ -1022,78 +1072,64 @@ extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* verts, void* indices, int nV
     subres.SysMemSlicePitch = 0;
 
     ID3D11Buffer* buffer;
-    if (FAILED(d3device->CreateBuffer(&bd, &subres, &buffer)))
+    if (FAILED(d3device->CreateBuffer(&bd, NULL, &buffer)))
     {
-        // TODO: Temporary arena buffer management.
-        fprintf(stderr, "%s: Failed to create vertex buffer!\n", __func__);
-        return NULL;
+        fprintf(stderr, "%s: Failed to create buffer!\n", __func__);
+        return -1;
     }
-    m->vertexData = buffer;
+    m->vertexBuffer = buffer;
 
-    bd.ByteWidth = m->nElements * 12;
+    bd.ByteWidth = m->nfaces * 12;
     bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
     subres.pSysMem = indices;
     subres.SysMemPitch = 4; // 4 bytes per integer.
-    if (FAILED(d3device->CreateBuffer(&bd, &subres, &buffer)))
+    if (FAILED(d3device->CreateBuffer(&bd, NULL, &buffer)))
     {
-        fprintf(stderr, "%s: Failed to create index buffer!\n", __func__);
-        return NULL;
+        fprintf(stderr, "%s: Failed to create buffer!\n", __func__);
+        return -1;
     }
+    m->indexBuffer = buffer;
+    */
 
-    m->indexData = buffer;
- 
-    return m;
+    return 0;
 }
 
-
-extern void ReleaseMesh(GFX_mesh* m)
+extern void DrawMeshTerminate(GFX_mesh* m)
 {
+    /*
     ID3D11Buffer* buf;
-    buf = reinterpret_cast<ID3D11Buffer *>(m->vertexData);
+    buf = (ID3D11Buffer *) m->vertexBuffer;
     buf->Release();
-    buf = reinterpret_cast<ID3D11Buffer *>(m->indexData);
+    buf = (ID3D11Buffer *) m->indexBuffer;
     buf->Release();
 
-    //MeshTerminate(m);
+    MeshTerminate(m);
+    */
 }
 
 extern void DrawRenderMesh(GFX_mesh* m)
 {
+    /*
     DrawFlush();
     Draw_SetConstants(&drawState.matStack[drawState.matStackIdx]);
 
-    ID3D11Buffer* verts = static_cast<ID3D11Buffer *>(m->vertexData);
-    ID3D11Buffer* indices = static_cast<ID3D11Buffer *>(m->indexData);
+    ID3D11Buffer* verts = (ID3D11Buffer *) m->vertices;
+    ID3D11Buffer* indices = (ID3D11Buffer *) m->indices;
 
-    UINT stride = sizeof(CustomVertexDX11);
+    UINT stride = sizeof(vertex_t);
     UINT offset = 0;
 
     immediateContext->IASetVertexBuffers(0, 1, &verts, &stride, &offset);
     immediateContext->IASetIndexBuffer(indices, DXGI_FORMAT_R32_UINT, 0);
     immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    immediateContext->DrawIndexed(m->nElements * 3, 0, 0);
-}
-
-extern void DrawMeshTerminate(GFX_mesh *mesh)
-{
-    if (mesh == NULL)
-    {
-        return;
-    }
-
-    ID3D11Buffer* buf;
-    buf = reinterpret_cast<ID3D11Buffer *>(mesh->vertexData);
-    buf->Release();
-    buf = reinterpret_cast<ID3D11Buffer *>(mesh->indexData);
-    buf->Release();
+    immediateContext->DrawIndexed(m->nfaces * 3, 0, 0);
+    */
 }
 
 
-static int CreateTargetSurface(TargetSurface* surface)
+static int CreateTargetSurface(TARGETSURFACE* surface)
 {
-    fprintf(stderr, "Window Handle: %p its hwnd: %p\n", windowHandle, windowHandle->backend->hwnd);
-
-    // OHHHH THIS MIGHT BE THE ERROR!!
+    // We use the Window Handle.
     D3D11_TEXTURE2D_DESC texDesc = { 0 };
     texDesc.Width = windowHandle->w;
     texDesc.Height = windowHandle->h;
@@ -1162,9 +1198,9 @@ static int CreateTargetSurface(TargetSurface* surface)
     return 0;
 }
 
-//static void ReleaseTexture(GFX_texture* texture);
+extern void ReleaseTexture(GFX_texture* texture);
 
-static void DeleteTargetSurface(TargetSurface* surface)
+static void DeleteTargetSurface(TARGETSURFACE* surface)
 {
     surface->depthStencilView->Release();
     ReleaseTexture(&surface->depthStencil);
@@ -1174,54 +1210,15 @@ static void DeleteTargetSurface(TargetSurface* surface)
 
 static HRESULT InitDirect3D(Window* win)
 {
-    puts("Initializing DirectX11...");
+    fprintf(stderr, "%s: Initializing DirectX...\n", __func__);
 
     HRESULT hr = S_OK;
 
-    fprintf(stderr, "%s: Win handle hwnd: %p\n", __func__, win->backend->hwnd);
-    fprintf(stderr, "%s: window w: %d window h: %d\n", __func__, win->w, win->h);
+    //RECT rc;
+    //GetClientRect(win->backend->hwnd, &rc);
+    //UINT width = rc.right - rc.left;
+    //UINT height = rc.top - rc.bottom;
 
-    /*
-    DXGI_SWAP_CHAIN_DESC sd = { 0 };
-    sd.BufferCount = 2;
-    //sd.BufferDesc.Width = win->w;
-    //sd.BufferDesc.Height = win->h;
-    sd.BufferDesc.RefreshRate.Numerator = 0;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM; 
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    // Turn multisampling off.
-    sd.SampleDesc.Count = 1;
-    sd.SampleDesc.Quality = 0;
-
-    sd.OutputWindow = win->backend->hwnd;
-    sd.Windowed = TRUE;
-
-    // Set the scanline ordering and scaling to be unspecified.
-    //sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-    //sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-
-    // Discard the backbuffer contents after presenting.
-    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-    UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-//#ifndef RELEASE 
-    flags |= D3D11_CREATE_DEVICE_DEBUG;
-//#endif 
-
-
-    // We get our features and device with swapchain.
-    // It creates the device, device (immediate) context, and swapchain.
-    D3D_FEATURE_LEVEL featureLevel;
-    hr = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE,
-            0, flags, NULL, 0, D3D11_SDK_VERSION,
-            &sd, &pSwapchain, &d3device, &featureLevel, &immediateContext);
-    if (FAILED(hr))
-    {
-        fprintf(stderr, "%s: Failed to create device and swapchain!\n", __func__);
-        return hr;
-    }
-    */
 
     hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void **) &dxgiFactory);
     if (FAILED(hr))
@@ -1285,6 +1282,8 @@ static HRESULT InitDirect3D(Window* win)
     }
 
     fprintf(stderr, "%s: YOO win w:%d, win h:%d\n", __func__, win->w, win->h);
+    fprintf(stderr, "%s: hwnd: %p\n", __func__, win->backend->hwnd);
+
     // Get the adapter (video card) description.
     DXGI_ADAPTER_DESC adapterDesc;
     hr = dxgiAdapter->GetDesc(&adapterDesc);
@@ -1373,33 +1372,8 @@ static HRESULT InitDirect3D(Window* win)
     }
 
 
-    // Now try to debug this.
-    {
-        HRESULT reason = d3device->GetDeviceRemovedReason();
-        switch (reason)
-        {
-            case DXGI_ERROR_DEVICE_REMOVED:
-                puts("Graphics device removed!");
-                break;
-            case DXGI_ERROR_DEVICE_RESET:
-                puts("Graphics device reset!");
-                break;
-            case DXGI_ERROR_DEVICE_HUNG:
-                puts("Device hung!");
-                break;
-            case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
-                puts("Internal driver error!");
-                break;
-            default:
-                puts("No error found!");
-                break;
-        }
-    }
-
-
-
     // Create render target view.
-    hr = pSwapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**> (&framebuffer));
+    hr = pSwapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID *) &framebuffer);
     if (FAILED(hr))
     {
         fprintf(stderr, "%s: Couldn't get back buffer!\n", __func__);
@@ -1412,14 +1386,13 @@ static HRESULT InitDirect3D(Window* win)
     }
 
 
-    // TODO: The problem has to be some malformed buffers?
 
     // We reuse our descriptors.
     D3D11_BUFFER_DESC bufferDesc = { 0 };
     bufferDesc.ByteWidth = VERTEX_BUFFER_SIZE;
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // We write it using the CPU.
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     hr = d3device->CreateBuffer(&bufferDesc, NULL, &streamVertexBuffer);
     if (FAILED(hr))
     {
@@ -1438,7 +1411,7 @@ static HRESULT InitDirect3D(Window* win)
         return -1;
     }
 
-    bufferDesc.ByteWidth = sizeof(ConstantVS);
+    bufferDesc.ByteWidth = sizeof(CONSTANT_VS);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -1449,7 +1422,7 @@ static HRESULT InitDirect3D(Window* win)
         return -1;
     }
 
-    bufferDesc.ByteWidth = sizeof(ConstantPS);
+    bufferDesc.ByteWidth = sizeof(CONSTANT_PS);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -1460,7 +1433,7 @@ static HRESULT InitDirect3D(Window* win)
         return -1;
     }
 
-    bufferDesc.ByteWidth = sizeof(ConstantPsScene);
+    bufferDesc.ByteWidth = sizeof(CONSTANT_PSSCENE);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -1472,7 +1445,7 @@ static HRESULT InitDirect3D(Window* win)
     }
 
     // Init shaders.
-    //defaultShader = ShaderLoad(SHADER_LAYOUT_SKINNED_ANIMATION, color_vs, color_ps);
+    defaultShader = ShaderLoad(SHADER_LAYOUT_SKINNED_ANIMATION, color_vs, color_ps);
 
     // Rasterizers.
     D3D11_RASTERIZER_DESC rasterizerDesc;
@@ -1542,7 +1515,7 @@ static HRESULT InitDirect3D(Window* win)
     hr = d3device->CreateBlendState(&blendDesc, &blendStates[BLEND_SUBTRACT]);
 
 
-    drawState.blend = static_cast<BlendMode>(-1);
+    drawState.blend = (BlendMode)(-1);
 
     // Depth stencil.
     D3D11_DEPTH_STENCIL_DESC depthStencilDesc = { 0 };
@@ -1576,25 +1549,182 @@ static HRESULT InitDirect3D(Window* win)
 
     surface2.color.flags |= TEXTURE_POINT;
 
-    puts("alright");
-
     return S_OK;
 }
 
 
+static int DoRender(void)
+{
+    // Begin. //
+    /*
+    float clearcolor[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
+    immediateContext->ClearRenderTargetView(renderTargetView, clearcolor);
+    immediateContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+    // And then render our object.
+    ////////////////////////////////////////////
+    {
+        // TODO: Stride.
+
+        //UINT stride1 = sizeof(float) * 6;
+        UINT stride1 = sizeof(vertex_t);
+        UINT offset1 = 0;
+        //UINT offset2 = sizeof(float) * 3;
+
+        immediateContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride1, &offset1);
+        // No two vertex buffers lmao.
+        //immediateContext->IASetVertexBuffers(0, 2, &vertexBuffer, &stride1, &offset2);
+
+        // Set to triangles.
+        immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        immediateContext->IASetInputLayout(vertexInputLayout);
+
+        immediateContext->VSSetShader(vertexShader, NULL, 0);
+        immediateContext->PSSetShader(pixelShader, NULL, 0);
+
+        ShaderUse(defaultShader);
+    }
+
+    // We fill in the matrices.
+    {
+        D3D11_MAPPED_SUBRESOURCE matRes;
+        HRESULT hr = S_OK;
+        hr = immediateContext->Map(matrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &matRes);
+        if (SUCCEEDED(hr)) {
+            // We fill data.
+            //printf("global pos="); PrintVec3(camera3Handle.pos);
+            //printf("global dir="); PrintVec3(camera3Handle.front);
+
+            //fprintf(stderr, "global dirx:%f\n", camera3Handle.front.x);
+
+            vec4 up = { camera3Handle.up.x, camera3Handle.up.y, camera3Handle.up.z, 0 };
+            vec4 dir = { camera3Handle.front.x, camera3Handle.front.y, camera3Handle.front.z, 0 };
+            vec4 eye = { camera3Handle.pos.x, camera3Handle.pos.y, camera3Handle.pos.z, 0 };
+            //printf("user up: "); PrintVec4(up);
+            //printf("user dir: "); PrintVec4(dir);
+
+            mat4 model; Mat4Ident(&model, 1.0f);
+            //printf("model: "); PrintMat4(model);
+
+            mat4 view; Mat4Ident(&view, 1.0f);
+            view = mat4::Look(eye, dir, up);
+
+            mat4 proj; Mat4Ident(&proj, 1.0f);
+
+            proj = mat4::Perspective(camera3Handle.fovy, graphics.aspect, 0.1f, 1000.0f);
+
+            //printf("view: "); PrintMat4(view);
+            //printf("proj: "); PrintMat4(proj);
+
+            // We directly set this raw.
+            mat4* matricesBuf = (mat4 *) matRes.pData;
+            matricesBuf[0] = model;
+            matricesBuf[1] = view;
+            matricesBuf[2] = proj;
+            immediateContext->Unmap(matrixBuffer, 0);
+        }
+
+        immediateContext->VSSetConstantBuffers(0, 1, &matrixBuffer);
+    }
+    // Then we draw the mesh with 6 vertices.
+    //immediateContext->Draw(6, 0);
+    immediateContext->Draw(utahTeapot.nfaces * 3, 0);
+
+    /////////////////////////////////////////
+
+
+    //  End. //
+    // Present the backbuffer to the screen since rendering is complete.
+    //if (VSYNC_ENABLED) {
+        // Lock to screen refresh rate.
+        pSwapchain->Present(1, 0);
+    //} else {
+    //    // Present as fast as possible.
+    //    pSwapchain->Present(0, 0);
+    //}
+    */
+
+
+    // 0x001428 is the RGB hex value for the DirectX clear color.
+    //DrawReset();
+    //DrawSetTarget();
+
+
+    //DrawPrepare();
+    //DrawFullFrame();
+
+    //DrawClear(0x001428);
+   
+    //DrawMesh(&utahTeapot);
+
+    //DrawBegin();
+
+    // TODO: maybe.
+    //DrawReset();
+
+
+    //DrawEnd();
+
+
+
+    return 0;
+}
+
+
+
+//b32 result;
+// NOTE: Issue?
+
+static int DoFrame(void)
+{
+    /*
+    if (IsKeyDown(VK_ESCAPE))
+    {
+        fprintf(stderr, "%s: alright, escaping...\n", __func__);
+        return -1;
+    }
+
+    // BEFORE: Update camera.
+    // We calculate dt.
+    double dt = deltaTimeU * 0.0001;
+    Camera3Step(&camera3Handle, (float) dt);
+
+    // USER FRAME.
+    if (AppFrame())
+    {
+        return -1;
+    }
+
+    // Do present the image afterwards.
+    if (DoRender())
+    {
+        fprintf(stderr, "%s: Failed to present image!\n", __func__);
+        return -1;
+    }
+    */
+
+    return 0;
+}
 
 /*
    Public interface.
 */
 
+// Do we serve any more spaghetti here?
 static DrawPass _passes[1] = { 0 };
-static mat4 viewMat = mat4{1.0f};
-
+static mat4 _viewMat = mat4{1.0f};
 extern int GraphicsInit(Window* win)
 {
-    // Create draw arena.
-    //drawState.drawArena = ArenaInit(MB(4), KB(4), ARENA_FLAG_GROWABLE);
+    // Then initialize the input.
+    // TODO: Why do we couple everything (event the input)
+    // to the graphics file?
+    /*
+    if (InputInit()) {
+        fprintf(stderr, "%s: Failed to init input system!\n", __func__);
+        return -1;
+    }
+    */
+
 
     // Init graphics.
     if (FAILED(InitDirect3D(win)))
@@ -1603,16 +1733,13 @@ extern int GraphicsInit(Window* win)
         return -1;
     }
 
+    // UTAH EXAMPLE.
     DrawSetPipeline(1, _passes);
     DrawSetPass2D(&_passes[0]);
     _passes[0].active = TRUE;
-    _passes[0].viewMatrix = &viewMat;
+    _passes[0].viewMatrix = &_viewMat;
     _passes[0].flags |= DRAW_PASS_FLAG_GAMMA;
-
-    DrawReset();
     DrawSetTarget();
-
-    drawState.currentPass = 0;
 
     // Init shader and buffer.
     defaultShader = ShaderLoad(SHADER_LAYOUT_BASIC_SHADED, color_vs, color_ps);
@@ -1622,9 +1749,41 @@ extern int GraphicsInit(Window* win)
         return -1;
     }
 
-    return 0;
+     return 0;
 }
 
+/*
+extern int GraphicsDriverInit(const wchar_t* title, int width, int height)
+{
+    // Get window handle.
+    //WINDOW* win = &windowHandle;
+    // Initialize window.
+    Window* win = WindowInit(title, width, height);
+    if (win == NULL)
+    {
+        fprintf(stderr, "%s: Failed to open a Window!\n", __func__);
+        return -1;
+    }
+
+    // graphics.frameWidth = win->w;
+    // graphics.frameHeight = win->h;
+    // graphics.aspect = (float) graphics.frameHeight / graphics.frameWidth;
+
+    // Set up the Window Handle.
+    windowHandle = win;
+
+    //Camera3Init(&camera3Handle);
+
+
+    if (GraphicsInit(win))
+    {
+        fprintf(stderr, "%s: Failed to initialize graphics subsystem!\n", __func__);
+        return -1;
+    }
+
+    return 0;
+}
+*/
 
 extern void GraphicsTerminate(void)
 {
@@ -1663,6 +1822,7 @@ extern void GraphicsTerminate(void)
     //defaultShader->pixelShader->Release();
     ShaderTerminate(defaultShader);
 
+    //TextureTerminate(defaultSquareTexture);
     ////////////////////////////// 
 
 
@@ -1739,66 +1899,48 @@ extern void GraphicsTerminate(void)
     //ShaderTerminate(defaultShader);
 }
 
+extern int GraphicsRun(void)
+{
+    /*
+    MSG msg;
+    b32 done;
+
+    ZeroMemory(&msg, sizeof(MSG));
+
+    done = false;
+    while (!done) {
+        startedTime = PlatformTimeUsec();
+
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+        if (msg.message == WM_QUIT) {
+            done = true;
+        } else {
+            // Otherwise, we do the frame processing.
+            if (DoFrame()) {
+                done = true;
+            }
+        }
+
+        deltaTimeU = PlatformTimeUsec() - startedTime;
+        //if (deltaTimeU < DTIME) {
+        //    PlatformSleepMs(DTIME - deltaTimeU);
+        //}
+    }
+
+    return 0;
+    */
+
+    return 0;
+}
+
 
 /*
    Texture functions.
 */
-
-extern void AllocateMutableTexture(int width, int height, void** args, int flags)
-{
-    // TODO: Soemthing.
-
-    /*
-    D3DFORMAT format = D3DFMT_X8R8G8B8;
-    if (flags & TEXTURE_ALPHA)
-    {
-        format = D3DFMT_A8R8G8B8;
-    }
-
-    // D3DPOOL_DEFAULT is for mutable textures,
-    // while D3DPOOL_MANAGED optimizes those textures if they're immutable.
-    d3device->CreateTexture(
-        width, height, 1, 1, format,
-        D3DPOOL_DEFAULT, reinterpret_cast<LPDIRECT3DTEXTURE9*>(args), NULL
-    );
-    */
-
-    D3D11_TEXTURE2D_DESC textureDesc;
-    ZeroMemory(&textureDesc, sizeof(textureDesc));
-    textureDesc.Width = width;
-    textureDesc.Height = height;
-    textureDesc.MipLevels = 1;
-    textureDesc.ArraySize = 1;
-    textureDesc.Format = (flags & TEXTURE_SRGB) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-    textureDesc.SampleDesc.Count = 1;
-    //textureDesc.SampleDesc.Quality = 1;
-    textureDesc.Usage = D3D11_USAGE_IMMUTABLE;
-    textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    textureDesc.MiscFlags = 0;
-    // We use mipmapping by default?
-    if (flags & TEXTURE_MIPMAP)
-    {
-        textureDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-        textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-        textureDesc.Usage = D3D11_USAGE_DEFAULT;
-        textureDesc.MipLevels = 1;
-    }
-
-    D3D11_SUBRESOURCE_DATA textureData;
-    textureData.pSysMem = NULL;
-    textureData.SysMemPitch = width * 4;
-
-    ID3D11Texture2D* texture2D;
-    HRESULT hr = d3device->CreateTexture2D(&textureDesc, &textureData, &texture2D);
-    if (FAILED(hr))
-    {
-        fprintf(stderr, "%s: Failed to load immutable texture!\n", __func__);
-        return;
-    }
-
-}
-
-
 
 extern GFX_texture* LoadImmutableTextureFromPixels(void* alloc, int w, int h, unsigned char* pix, int flags)
 {
@@ -1849,19 +1991,7 @@ extern GFX_texture* LoadImmutableTextureFromPixels(void* alloc, int w, int h, un
         immediateContext->GenerateMips(resourceView);
     }
 
-    //TEXTURE* tex = (TEXTURE *) _MALLOC(sizeof(TEXTURE));
-    // Literally.
-    GFX_texture* tex;
-    if (alloc)
-    {
-        //ARENA* arena = reinterpret_cast<ARENA *>(alloc);
-        //tex = ArenaPushStruct(arena, GFX_texture);
-    }
-    else
-    {
-        tex = (GFX_texture *) _MALLOC(sizeof(GFX_texture));
-    }
-
+    GFX_texture* tex = (GFX_texture *) _MALLOC(sizeof(GFX_texture));
     tex->w = w;
     tex->h = h;
     tex->flags = flags;
@@ -1872,13 +2002,8 @@ extern GFX_texture* LoadImmutableTextureFromPixels(void* alloc, int w, int h, un
     return tex;
 }
 
-extern void ReleaseTexture(GFX_texture* texture)
+extern void ReleaseTexture(GFX_texture *texture)
 {
-    if (texture == NULL)
-    {
-        return;
-    }
-
     ID3D11ShaderResourceView* resView = (ID3D11ShaderResourceView *) texture->resourceView;
     if (resView)
     {
@@ -1892,9 +2017,9 @@ extern void ReleaseTexture(GFX_texture* texture)
     texture->handle = NULL;
 }
 
-extern void TextureTerminate(void* alloc, GFX_texture* texture)
+extern void TextureTerminate(void* alloc, GFX_texture *texture)
 {
-    if (texture == NULL)
+    if (!texture)
     {
         return;
     }
@@ -1906,11 +2031,13 @@ extern void TextureTerminate(void* alloc, GFX_texture* texture)
     }
 
     ReleaseTexture(texture);
-    if (alloc)
-    {
-    }
-    else
-    {
-        delete texture;
-    }
+    _FREE(texture);
 }
+
+
+extern void AllocateMutableTexture(int width, int height, void* args, int flags)
+{
+    // TODO:
+    puts("implement this");
+}
+

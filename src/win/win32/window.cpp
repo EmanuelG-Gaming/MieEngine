@@ -3,13 +3,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
+/*
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #define UNICODE
 #define _UNICODE
+*/
 
-//#include "platform.h"
+#include "platform.h"
 
 #include <fileapi.h>
 #include <windef.h>
@@ -166,6 +167,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT umessage, WPARAM wparam, LPARAM 
 extern Window* WindowInit(const wchar_t* title, int width, int height)
 {
     PlatformInit();
+
     LogInfo("Initializing window!\n");
 
     if (!windowInitialized)
@@ -380,31 +382,7 @@ static int RegisterWinClass(void)
         LogErrorEmitF("%s: Failed to get module handle!\n", __func__);
         return FALSE;
     }
-
-    /*
-    WNDCLASSEX wc;
-    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-    wc.lpfnWndProc = (WNDPROC) WindowProc;
-    wc.cbClsExtra = 0;
-    wc.cbWndExtra = 0;
-    wc.hInstance = moduleHandle;
-    wc.cbClsExtra = 0;
-    wc.hIcon = LoadIcon(wc.hInstance, (LPCTSTR) IDI_APPLICATION);
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
-    wc.lpszMenuName = NULL;
-    wc.lpszClassName = WIN_CLASS_NAME;
-    //wc.hIconSm = LoadIcon(wc.hInstance, (LPCTSTR) IDI_APPLICATION);
-    */
-    /*
-    WNDCLASSW wc;
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = moduleHandle;
-    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
-    wc.lpszClassName = WIN_CLASS_NAME;
-
-    ATOM atom = RegisterClassW(&wc);
-    */
+    
     WNDCLASSEX wc;
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wc.lpfnWndProc = WndProc;
@@ -418,6 +396,7 @@ static int RegisterWinClass(void)
     wc.lpszMenuName = NULL;
     wc.lpszClassName = WIN_CLASS_NAME;
     wc.cbSize = sizeof(WNDCLASSEX);
+
 
     ATOM atom = RegisterClassEx(&wc);
     if (!atom)

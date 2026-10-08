@@ -1013,7 +1013,7 @@ static mat4 _viewMat { 1.0f };
 extern int GraphicsInit(Window* win)
 {
     // Create draw arena.
-    drawState.drawArena = ArenaInit(MB(4), KB(4), ARENA_FLAG_GROWABLE);
+    //drawState.drawArena = ArenaInit(MB(4), KB(4), ARENA_FLAG_GROWABLE);
 
     if (FAILED(InitDirect3D(win)))
     {
@@ -1072,7 +1072,7 @@ extern void GraphicsTerminate(void)
     }
 
     // And then the arena.
-    ArenaTerminate(drawState.drawArena);
+    //ArenaTerminate(drawState.drawArena);
 }
 
 

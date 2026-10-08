@@ -7,6 +7,8 @@
 
 #include "texture.h"
 
+#include "../mem/arena.h"
+
 
 /*
    Credits: Partially taken from https://github.com/LNooteBoom/RIEngine.
@@ -318,7 +320,7 @@ extern void DrawColorMode(ColorMode mode);
 extern void DrawColor(float r, float g, float b, float a);
 extern void DrawColor2(float r, float g, float b, float a);
 
-extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* data, void* indices, int nVertices);
+extern GFX_mesh* DrawUploadMesh(void* alloc, void* data, void* indices, int nVertices);
 extern void DrawMeshTerminate(GFX_mesh* mesh);
 extern void DrawRenderMesh(GFX_mesh* mesh);
 
