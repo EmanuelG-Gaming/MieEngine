@@ -223,7 +223,12 @@ extern int DrawTextGetSize(GFX_font* font, const char* text,
     i32 fontHeight, float spacingX, float spacingY, float scale,
     float* w, float* h);
 
-extern int DrawTextPro(GFX_font* font, const char* text, float ox, float oy,
+extern int DrawTextGlitch(GFX_font* font, const char* text, int indexStride,
+    int fontHeight, float spacingX, float spacingY, float scale,
+    int flags, const TextDrawStyle* options);
+
+
+extern int DrawTextPro(GFX_font* font, const char* text,
     int fontHeight, float spacingX, float spacingY, float scale,
     int flags, const TextDrawStyle* options);
 

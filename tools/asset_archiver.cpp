@@ -55,6 +55,7 @@ static constexpr FileCategory fileCategories[] = {
     { "png;jpg;jpeg", "images/" },      // Images.
     { "ttf", "fonts/" },                // Fonts.
     { "bin;bytc", "bin/" },             // Binaries/bytecode.
+    { "vso;pso", "shaders/" },
     //{ "wav;ogg", "music/" },            // Music.
     //{ "wav;ogg", "sounds/" },           // Sounds.
 };
@@ -217,6 +218,17 @@ int DoMainCompressed(const char* dirPath, const char* outPath)
             strcat(dirPath, finfo->relDirectoryPath);
             strcat(dirPath, finfo->fileName);
 
+#if defined(_WIN32) || defined(_WIN64)
+            {
+                char* ptr = dirPath;
+                while (*ptr)
+                {
+                    if (*ptr == '\\') *ptr = '/';
+                    ptr++;
+                }
+            }
+#endif
+
             // TODO: Issue here.
             char* buf = new char[ARCHIVE_FILE_METADATA_SIZE];
             // offset 0
@@ -376,6 +388,23 @@ int DoMainUncompressed(const char* dirPath, const char* outPath)
 
             strcat(dirPath, finfo->relDirectoryPath);
             strcat(dirPath, finfo->fileName);
+            // Also replace the backslashes.
+
+#if defined(_WIN32) || defined(_WIN64)
+            {
+                char* ptr = dirPath;
+                while (*ptr)
+                {
+                    if (*ptr == '\\')
+                    {
+                        *ptr = '/';
+                    }
+                    ptr++;
+                }
+            }
+#endif
+            //fprintf(stderr, "%s: dirPath: %s\n", 
+            //        __func__, dirPath);
 
             // TODO: Issue here.
             char* buf = new char[ARCHIVE_FILE_METADATA_SIZE];
@@ -392,7 +421,8 @@ int DoMainUncompressed(const char* dirPath, const char* outPath)
             // offset 12
             char* st = buf + 12;
             memset(st, 0, 64);
-            memcpy(st, dirPath, strlen(dirPath));
+            memcpy(st, dirPath, 64);
+
 
             WriteToFile(ctx.fp, buf, ARCHIVE_FILE_METADATA_SIZE);
             delete[] buf;

@@ -69,6 +69,13 @@
 #define FBO_TEXTURE2_DEPTH 3
 
 
+typedef enum ShaderLayout {
+    SHADER_LAYOUT_NONE = 0,
+    SHADER_LAYOUT_FLATCOLOR,
+    SHADER_LAYOUT_BASIC_SHADED,
+    SHADER_LAYOUT_SKINNED_ANIMATION,
+} ShaderLayout;
+
 typedef enum SamplerMode {
     SAMPLER_NEAREST,
     SAMPLER_LINEAR,
@@ -225,7 +232,7 @@ typedef struct DrawPass {
 } DrawPass;
 
 typedef struct DRAWSTATE {
-    //ARENA* drawArena;
+    ARENA* drawArena;
 
     mat4 matStack[16];
     int matStackIdx;
@@ -337,6 +344,14 @@ extern void DrawVertex3D(float x, float y, float z, float nx, float ny, float nz
 extern void DrawIndices(int verts, int n, const u32* list);
 
 /*
+   Shaders.
+*/
+extern GFX_shader* ShaderLoad(ShaderLayout format, const char* vertexKey, const char* pixelKey);
+extern void ShaderTerminate(GFX_shader* shader);
+extern int ShaderUse(GFX_shader* shader);
+extern void ShaderSet(float value, int index);
+
+/*
    Textures.
 */
 extern void DrawSrcRect(float x, float y, float w, float h);
@@ -377,11 +392,5 @@ extern void DrawSkybox(void);
 extern int GraphicsInit(Window* window);
 extern void GraphicsTerminate(void);
 
-//extern int Draw_driverInit(void);
-
-//extern void DrawClear(unsigned int color);
-//extern void DrawPresent(void);
-
-//extern void Draw_textString(const char* str, int x, int y, unsigned int color);
 
 #endif /* DRAW_H_ */

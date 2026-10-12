@@ -235,6 +235,89 @@ GFX_texture* Load2x2PixelSquare(ARENA* arena)
 }
 
 
+unsigned char DOOM_firePallette[37*4] = {
+    7, 7, 7, 7, // 255 - full opacity.
+    31, 7, 7, 31,
+    47, 15, 7, 47,
+    71, 15, 7, 71,
+    87, 23, 7, 87,
+    103, 31, 7, 150,
+    119, 39, 7, 150,
+    143, 39, 7, 150,
+    159, 47, 7, 160,
+    175, 63, 7, 175,
+    191, 71, 7, 191,
+    199, 71, 7, 200,
+    223, 79, 7, 223,
+    223, 87, 7, 223,
+    223, 87, 7, 223,
+    215, 95, 7, 240,
+    215, 95, 7, 255,
+    215, 103, 15, 255,
+    207, 111, 15, 255,
+    207, 119, 15, 255,
+    207, 127, 15, 255,
+    207, 135, 23, 255,
+    199, 135, 23, 255,
+    199, 143, 23, 255,
+    191, 151, 31, 255,
+    191, 159, 31, 255,
+    191, 167, 39, 255,
+    191, 167, 39, 255,
+    191, 175, 47, 255,
+    183, 175, 47, 255,
+    183, 183, 47, 255,
+    183, 183, 55, 255,
+    207, 207, 111, 255,
+    239, 239, 100, 255,
+    223, 223, 159, 255,
+    239, 239, 199, 255,
+    255, 255, 255, 255,
+};
+
+unsigned char sinisterPallete[] = {
+    200, 0, 0, 255,
+    200, 60, 60, 255,
+    255, 0, 0, 255,
+    255, 140, 140, 255,
+};
+
+#define PAL_SIZE(arr) (sizeof(arr) / 4)
+
+void SpreadFire(int* buf, int w, int h, int src)
+{
+    int len = w*h;
+
+    int pixel = buf[src];
+    if (pixel == 0)
+    {
+        if (src >= w)
+        {
+            buf[src+w] = 0;
+        }
+    }
+    else
+    {
+        int randIndex = static_cast<int> (RNG_randf32_range(0, 3.0f));
+        int dst = src + randIndex - 1;
+
+        // Fire spreads from the line at the first row of the memory framebuffer.
+        // Bounds checking.
+        if (dst >= 0 && dst < len)
+        {
+            int newPixel = pixel - (randIndex & 1);
+            if (newPixel >= 0)
+            {
+                int dstIdx = dst + w;
+                if (dstIdx >= 0 && dstIdx < len)
+                {
+                    buf[dstIdx] = newPixel;
+                }
+            }
+        }
+    }
+}
+
 int WindowTesting(void)
 {
     PlatformInit();
@@ -277,6 +360,8 @@ int WindowTesting(void)
     GFX_font* font2 = FontInit(arena);
     FontAtlasPage* page2 = FontPageInit(font2, 0);
     FontLoadTTF(font2, 0, "assets/fonts/Exo-Bold.ttf");
+    //FontLoadTTF(font2, 0, "assets/fonts/Charakterny.ttf");
+
 
     GFX_texture* fontTex2 = FontUploadTexture(font2, 0);
 
@@ -298,20 +383,34 @@ int WindowTesting(void)
     MeshBuilder builder = MeshCreateCuboid(arena, 1, 1, 1);
     GFX_mesh* mesh = MeshBuilderCreateMesh(&builder, arena);
 
-    GFX_texture* texture = LoadTexture(arena, "images\\code.png");
+    GFX_texture* texture = LoadTexture(arena, "images/code.png");
 
     //GFX_texture* textureCube = LoadTexture(arena, "images\\lesanae.jpeg");
-    GFX_texture* zoeTexture = LoadTexture(arena, "images\\zoe.png", TEXTURE_ALPHA);
-    GFX_texture* programTexture = LoadTexture(arena, "images\\programming.png");
-    GFX_texture* perlTexture = LoadTexture(arena, "images\\perl-be-like.png");
-    GFX_texture* smallExecTexture = LoadTexture(arena, "images\\small.png");
-    GFX_texture* flareTexture = LoadTexture(arena, "images\\spark1.png", TEXTURE_ALPHA);
+    GFX_texture* zoeTexture = LoadTexture(arena, "images/zoe.png", TEXTURE_ALPHA);
+    GFX_texture* programTexture = LoadTexture(arena, "images/programming.png");
+    GFX_texture* perlTexture = LoadTexture(arena, "images/perl-be-like.png");
+    GFX_texture* smallExecTexture = LoadTexture(arena, "images/small.png");
+    GFX_texture* flareTexture = LoadTexture(arena, "images/spark1.png", TEXTURE_ALPHA);
+
 
     // Generate some glitch image.
     SoftImage* glitch = SoftImageInitOrigin(arena, 512, 512, 4);
     SoftImage_generateGlitchBIOS(glitch, 0.5f);
     GFX_texture* glitchTex = LoadImmutableTextureFromPixels(arena, glitch->width, glitch->height, glitch->data, 0);
 
+    // DOOM fire viewport texture.
+    GFX_texture* fireTex = AllocateMutableTexture(640, 480, NULL, 0);
+    GFX_texture* sinisterTex = AllocateMutableTexture(320, 240, NULL, 0);
+
+    int* fireBuffer = new int[fireTex->w*fireTex->h];
+    _MEMSET(fireBuffer, 0, sizeof(int) * fireTex->w*fireTex->h);
+
+    for (int x = 0; x < fireTex->w; ++x)
+    {
+        fireBuffer[x] = 36;
+    }
+
+    GFX_shader* distortionShader = ShaderLoad(SHADER_LAYOUT_BASIC_SHADED, "assets/shaders/distort.vso", "assets/shaders/distort.pso");
 
     // Load flashing images.
     // Might use some procedurally-generated glitch textures.
@@ -376,7 +475,7 @@ int WindowTesting(void)
 
         // x,y,z args (quaternion axis-angle rotation)
         //{ ANM_ANGLE_VEL, ANM_NEXT, 0, 0b1111, { F32LIT(0), F32LIT(0), F32LIT(0.01f) }},
-        { ANM_SCALE, ANM_NEXT, 0, 0b1111, { F32LIT(0.1f), F32LIT(0.1f) } },
+        { ANM_SCALE, ANM_NEXT, 0, 0b1111, { F32LIT(0.05f), F32LIT(0.05f) } },
         { ANM_BLENDMODE, ANM_NEXT, 0, 0b1111, { BLEND_ADD }},
 
         { ANM_DESTROY, 0, 0, 0b0000, { 0 } },
@@ -467,7 +566,7 @@ int WindowTesting(void)
         ShaderUse(defaultShader);
         DrawTexture(0, pixSquare);
 
- 
+
         if (1) {
             // 1st pass.
             drawState.currentPass = 0;
@@ -552,30 +651,54 @@ int WindowTesting(void)
             //DrawRect(2, 2);
             //DrawBlend(BLEND_ALPHA);
 
+            if (1) {
+                unsigned int rowPitch;
+                unsigned char* buf = TextureLock(sinisterTex, &rowPitch, NULL);
+                for (int y = 0; y < sinisterTex->h; ++y)
+                {
+                    int palIndex = RNG_boundedRand(PAL_SIZE(sinisterPallete));
+                    unsigned char* palColor = sinisterPallete + (palIndex * 4);
+
+                    int bufRowAddr = y * rowPitch;
+                    for (int x = 0; x < sinisterTex->w; ++x)
+                    {
+                        unsigned char* pix = buf + (bufRowAddr + (x * 4));
+
+                        float rand = RNG_randf32_range(1, 64);
+                        float alpha = ((y*(((int) (rand)) >> 4))) % ((int) rand) / rand;
+
+                        pix[0] = palColor[0] * alpha;
+                        pix[1] = palColor[1] * alpha;
+                        pix[2] = palColor[2] * alpha;
+                        pix[3] = palColor[3] * alpha;
+                    }
+                }
+
+                TextureUnlock(sinisterTex);
+            }
 
             DrawColor(1, 1, 1, 1);
             DrawColor2(1, 1, 1, 1);
             DrawColorMode(COLOR_LR);
 
-
-            // Run VM.
-            DrawTexture(0, flareTexture);
-
-            {
-                // Update parent VM first.
-                parentvm.run(&parentvm);
-                parentvm.update(&parentvm);
-            }
-
-            AnmVM::run(&vm);
             // Draw stars.
-            {
+            if (0) {
+                // Run VM.
+                DrawTexture(0, flareTexture);
+
+                {
+                    // Update parent VM first.
+                    parentvm.run(&parentvm);
+                    parentvm.update(&parentvm);
+                }
+
+                AnmVM::run(&vm);
                 AnmVM::update(&vm);
 
                 float vmx = vm.entityPos.x;
                 float vmy = vm.entityPos.y;
 
-                RNG_seed(0, 2);
+                //RNG_seed(0, 2);
                 for (int i = 0; i < 10000; ++i)
                 {
                     float randAngle = RNG_randf32_range(0, PI2);
@@ -591,9 +714,71 @@ int WindowTesting(void)
                 vm.entityPos.x = vmx;
                 vm.entityPos.y = vmy;
             }
+
+
+            if (1) {
+                for (int y = 0; y < fireTex->h; ++y)
+                {
+                    int rowAddr = fireTex->w * y;
+                    for (int x = 0; x < fireTex->w; ++x)
+                    {
+                        SpreadFire(fireBuffer, fireTex->w, fireTex->h, rowAddr + x);
+                    }
+                }
+
+                // Copy CPU data to GPU.
+                unsigned int rowPitch;
+                unsigned char* buf = TextureLock(fireTex, &rowPitch, NULL);
+                for (int y = 0; y < fireTex->h; ++y)
+                {
+                    int bufRowAddr = y * rowPitch;
+                    for (int x = 0; x < fireTex->w; ++x)
+                    {
+                        int fire = fireBuffer[(y * fireTex->w + x)];
+
+                        unsigned char* pix = buf + (bufRowAddr + (x * 4));
+
+                        _MEMCPY(pix, DOOM_firePallette + (fire * 4), 4);
+                    }
+                }
+
+                // Blit texture.
+                /*
+                for (int y = 0; y < fireTex->h; ++y)
+                {
+                    _MEMCPY(buf + ((y * rowPitch)), src + ((y * rowPitch)), rowPitch);
+                }
+                */
+                TextureUnlock(fireTex);
+            }
+
+
+            DrawTexture(1, sinisterTex);
+            DrawTexture(0, fireTex);
+
+            ShaderUse(distortionShader);
+
+            DrawMatIdentity();
+            DrawMatRotate3D(0, 0, -PI*0.5);
+            DrawRect(2, 2);
+            DrawMatIdentity();
+
+            ShaderUse(defaultShader);
+
+            // Draw DOOM texture.
+            if (0)
+            {
+                DrawBlend(BLEND_ADD);
+                DrawTexture(0, fireTex);
+                DrawMatIdentity();
+                DrawRect(2, -2);
+                DrawBlend(BLEND_ALPHA);
+            }
+
             DrawTexture(0, pixSquare);
 
             // Draw from 1st font.
+            /*
             if (0) {
                 const char* text = "Holy fucking shit?!?1\n";
                 float scale = 0.005f;
@@ -616,6 +801,7 @@ int WindowTesting(void)
                 DrawTextGetSize(font, text, 1, 0, 0, scale, &width, &height);
                 DrawTextPro(font, text, 0.3f-width*0.5f, -0.3f-height*0.5f, 1, 0.0f, 0.0f, scale, 0, NULL);
             }
+            */
 
             // Draw from 2nd font.
             if (0) {
@@ -627,7 +813,12 @@ int WindowTesting(void)
                 DrawColorMode(COLOR_UD);
                 DrawBlend(BLEND_ALPHA);
 
-                DrawTextPro(font2, text, -0.1, 0, 1, 0.0f, 0.0f, scale, 0, NULL);
+                DrawTexture(0, font2->atlas.pages[0].texture);
+                DrawMatIdentity();
+                DrawMatTranslate(-0.1f, 0.0f);
+                DrawTextPro(font2, text, 1, 0.0f, 0.0f, scale, 0, NULL);
+
+                DrawMatIdentity();
                 /*
                 DrawColorMode(COLOR_LR);
                 DrawBlend(BLEND_ADD);
@@ -636,6 +827,28 @@ int WindowTesting(void)
                 DrawBlend(BLEND_ALPHA);
                 */
             }
+
+            if (1) {
+                const char* text = "There is too much fire.";
+                float scale = 0.004f;
+
+                DrawColor(1, 1, 1, 0.8);
+                DrawColor2(1, 1, 1, 0.8);
+                DrawColorMode(COLOR_UD);
+                DrawBlend(BLEND_ADD);
+
+                mat4 mat { 1.0f };
+                mat.c[3] = 50.0f;
+                mat.c[7] = -20.0f;
+
+                DrawSetMatrix(mat.c);
+                //DrawMatTranslate(-0.5f, 0.5);
+                DrawTexture(0, font2->atlas.pages[0].texture);
+                DrawTextPro(font2, text, 1, 0.0f, 0.0f, scale, 0, NULL);
+                DrawBlend(BLEND_ALPHA);
+                DrawMatIdentity();
+            }
+
 
             DrawFlush();
         }

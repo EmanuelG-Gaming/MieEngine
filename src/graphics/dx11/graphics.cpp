@@ -1,139 +1,43 @@
-#include "../draw.h"
-#include "../../base/base_log.h"
-#include "../../win/win.h"
+#include "../../base/base_defs.h"
+#include "../../base/math/mathf.h"
 
-#include <stddef.h>
+//#include "draw3d.h"
+//#include "model.h"
+//#include "texture.h"
+//#include "font.h"
+
+#include "../draw.h"
+#include "../../io/asset.h"
+
+
 #include <stdio.h>
+#include <stdlib.h>
+
+#include <map>
 
 #include "../../win/win32/window.cpp"
 
 #include <d3d11.h>
+//#include <d3dcompiler.h>
 
-/*
-   TODO: Use shader bytecode directly?
-*/
-#include <d3dcompiler.h>
-
-
-
-// Multiline string.
-#define D3D_HLSL_DECL(...) #__VA_ARGS__
-
-static const char* color_vs = D3D_HLSL_DECL(
-    cbuffer vs_constants : register(b0) {
-        column_major float4x4 modelView; // Model matrix.
-        column_major float4x4 projection;
-        column_major float4x4 normMat;
-    };
-
-    // Typedefs.
-    struct VertexInputType {
-        float3 position: POSITION;
-        //float3 color: COLOR;
-
-        //float3 position: POSITION;
-
-        //float4 tangents: TANGENTS;
-        //float4 joints: JOINTS;
-        //float4 weights: WEIGHTS;
-        float3 normal : NORMAL;
-        float2 texCoords : TEXCOORDS;
-
-        float4 color: COLOR;
-    };
-
-    struct PixelInputType {
-        float4 projPosition: SV_POSITION; // REQUIRED.
-
-        float3 viewPos : POSITION;
-        //float4 tangents: TANGENTS;
-        //float4 joints: JOINTS;
-        //float4 weights: WEIGHTS;
-
-        float3 normal : NORMAL;
-        float2 texCoords : TEXCOORDS;
-        float4 color: COLOR;
-
-    };
-
-    // Vertex shader.
-    PixelInputType VS(VertexInputType input) {
-        PixelInputType output;
-
-        float4 pos = mul(modelView, float4(input.position, 1.0f));
-        //output.position = mul(viewMatrix, output.position);
-        //output.position = mul(projectionMatrix, output.position);
-
-        output.projPosition = mul(projection, pos);
-        //output.projPosition = float4(input.position, 1.0f);
-        output.viewPos = pos.xyz;
-
-        output.normal = mul(normMat, float4(input.normal, 0.0)).xyz;
-        output.texCoords = input.texCoords;
-        output.color = input.color;
-
-        return output;
-    }
-);
-
-static const char* color_ps = D3D_HLSL_DECL(
-    // Typedefs.
-    /*
-    struct PixelInputType {
-    float4 position: SV_POSITION;
-    float4 color: COLOR;
-    };
-    */
-
-    struct PS_Light {
-        float3 pos;
-        float3 ambient;
-        float3 diffuse;
-        float3 specular;
-        float constant;
-        float lin;
-        float quadratic;
-        float intensity;
-    };
-    struct PS_Texture {
-        float2 pos;
-        float2 scale;
-    };
-    //#define N_POINTLIGHTS 8
-    //#define N_TEXS 8
-
-    cbuffer ps_constants : register(b0) {
-        //PS_Texture tex[N_TEXS];
-        PS_Texture tex[8];
-    };
-    cbuffer ps_light_constants : register(b1) {
-        PS_Light dir_light;
-        //PS_Light point_lights[N_POINTLIGHTS];
-        PS_Light point_lights[8];
-
-        float fog_min;
-        float fog_max;
-        float unused1;
-        float unused2;
-        float3 fog_color;
-    };
-    SamplerState my_sampler : register(s0);
-    texture2D base_texture : register(t0);
-    texture2D texture1 : register(t1);
+// Ok.
+//#define FULLSCREEN 0
+//#define VSYNC_ENABLED 1
+#define SCREEN_DEPTH (1000.0f)
+#define SCREEN_NEAR (0.3f)
 
 
-    // Pixel shader.
-    float4 PS(PixelInputType input) : SV_TARGET {
-        return base_texture.Sample(my_sampler, input.texCoords) * input.color;
-        //float z = (input.position.y * 0.095) +  (input.position.x  *  0.095);
+#if defined(UNICODE) || defined(_UNICODE)
+#define WIN_HAS_UNICODE 1
+#endif
 
-        //return float4(input.position.y / 255, input.position.x / 255, z / 255, 1.0);
-        //return input.color;
-        //return float4(1, 1, 0, 1);
-    }
-);
+#ifdef WIN_HAS_UNICODE
+#define UNICODE_CAST(str) (const wchar_t *) str
+#else
+#define UNICODE_CAST(str) (const char_t *) str
+#endif
 
-#ifdef RELEASE
+#ifdef RELEASE 
 #define VBO_MAX_SIZE 0x4000
 #define EBO_MAX_SIZE 0x4000
 #else
@@ -141,24 +45,25 @@ static const char* color_ps = D3D_HLSL_DECL(
 #define EBO_MAX_SIZE 0x8000
 #endif
 
-#ifdef RELEASE
-#define VERTEX_BUFFER_SIZE 0x4000
+
+#ifdef RELEASE 
+#define VERTEX_BUFFER_sIZE 0x4000
 #define INDEX_BUFFER_SIZE 0x4000
 #else
 #define VERTEX_BUFFER_SIZE 0x8000
 #define INDEX_BUFFER_SIZE 0x8000
 #endif
 
-
 /*
-   DirectX constant buffers.
+   DirectX Constant buffers.
 */
 
-typedef struct ConstantVS {
+
+typedef struct ConstantVs {
     mat4 modelView;
     mat4 projection;
     mat4 normMat;
-} ConstantVS;
+} ConstantVs;
 
 typedef struct ConstantPsTex {
     float offs[2];
@@ -177,6 +82,12 @@ typedef struct ConstantPsLight {
     float intensity;
 } ConstantPsLight;
 
+typedef struct PsRegisters {
+    // General-purpose registers.
+    float floatVars[16];
+} PsRegisters;
+
+
 typedef struct ConstantPsScene {
     ConstantPsLight dirLight;
     ConstantPsLight pointLights[8];
@@ -186,85 +97,28 @@ typedef struct ConstantPsScene {
     float fogColor[4];
 } ConstantPsScene;
 
-typedef struct ConstantPS {
+typedef struct ConstantPs {
     ConstantPsTex tex[8];
-} ConstantPS;
+
+    PsRegisters regs;
+} ConstantPs;
 
 
 
 
 
 /*
-   Render state.
+   Global state.
 */
-/*
-static int currNverts;
-static int currNindices;
-
 DRAWSTATE drawState;
+//LIGHT dirLight;
+//LIGHT PointLights[8];
+//CAMERA3D camera3Handle;
 
-static mat4 identMat { 1.0f };
+uint32_t fogColor;
+float fogMin, fogMax;
 
-// Direct3D variables.
-static ID3D11Device* d3device = NULL;
-static ID3D11DeviceContext* immediateContext = NULL;
-static IDXGISwapChain* pSwapchain = NULL;
-
-// Sampler states.
-static ID3D11SamplerState* linearSampler = NULL;
-static ID3D11SamplerState* pointSampler = NULL;
-// Raster states.
-static ID3D11RasterizerState* raster2D = NULL;
-static ID3D11RasterizerState* raster3D = NULL;
-static ID3D11RasterizerState* raster3Dinvert = NULL;
-// Depth stencils.
-static ID3D11DepthStencilState* depthStencil3D = NULL;
-static ID3D11DepthStencilState* depthStencil3DnoWrite = NULL;
-static ID3D11DepthStencilState* depthStencil2D = NULL;
-// Blending modes.
-static ID3D11BlendState* blendStates[BLEND_COUNT];
-
-
-
-// Vertex and index buffer.
-static ID3D11Buffer* streamVertexBuffer = NULL;
-static ID3D11Buffer* streamIndexBuffer = NULL;
-static D3D11_MAPPED_SUBRESOURCE streamVertexMappedBuffer;
-static D3D11_MAPPED_SUBRESOURCE streamIndexMappedBuffer;
-
-// Constant buffers.
-static ID3D11Buffer* constantVSBuffer = NULL;
-static ID3D11Buffer* constantPSBuffer = NULL;
-static ID3D11Buffer* constantPSSceneBuffer = NULL;
-
-
-// DXGI (are these really necessary)?
-static IDXGIFactory* dxgiFactory = NULL;
-static IDXGIAdapter* dxgiAdapter = NULL;
-static IDXGIOutput* adapterOutput = NULL;
-static char videoCardDescription[128];
-
-
-static D3D11_VIEWPORT viewport;
-
-typedef struct TargetSurface {
-    GFX_texture color;
-    GFX_texture depthStencil;
-
-    ID3D11RenderTargetView* colorView;
-    ID3D11DepthStencilView* depthStencilView;
-} TargetSurface;
-static TargetSurface surface1;
-static TargetSurface surface2;
-
-// The 3rd target surface (the one needed to be shown to the screen).
-static ID3D11Texture2D* framebuffer = NULL;
-static ID3D11RenderTargetView* framebufferView = NULL;
-*/
-
-DRAWSTATE drawState;
-
-static mat4 identMat { 1.0f };
+static mat4 identMat{1.0f};
 
 /*
    Direct3D variables.
@@ -321,18 +175,31 @@ static TargetSurface surface2;
 static ID3D11Texture2D* framebuffer = NULL;
 static ID3D11RenderTargetView* framebufferView = NULL;
 
-
+static float floatRegs[16];
 
 
 /*
-   Shader pipeline loader.
+   Custom things.
 */
-typedef enum ShaderLayout {
-    SHADER_LAYOUT_NONE = 0,
-    SHADER_LAYOUT_FLATCOLOR,
-    SHADER_LAYOUT_BASIC_SHADED,
-    SHADER_LAYOUT_SKINNED_ANIMATION,
-} ShaderLayout;
+//static MESH utahTeapot;
+typedef struct GFX_shader GFX_shader;
+static GFX_shader* defaultShader = NULL;
+
+
+
+//static FONT* defaultFont = NULL;
+//static TEXTURE* fontTexture = NULL;
+//static TEXTURE* defaultSquareTexture = NULL;
+
+
+
+// Timing.
+//#define DTIME 20
+
+//static u64 startedTime = 0;
+//static u64 deltaTimeU = 0;
+
+
 
 typedef struct VertexShader {
     ID3D11VertexShader* vs;
@@ -342,129 +209,159 @@ typedef struct VertexShader {
     VertexShader(ID3D11VertexShader* vs, ID3D11InputLayout* layout) : vs(vs), inputLayout(layout) {}
 } VertexShader;
 
-typedef struct Shader {
+typedef struct GFX_shader {
     VertexShader vertexShader;
     ID3D11PixelShader* pixelShader;
-} Shader;
+} GFX_shader;
 
-static Shader* defaultShader = NULL;
 
+static std::map<const char*, VertexShader> shaderVsMap;
+static std::map<const char*, ID3D11PixelShader*> shaderPsMap;
+
+
+
+
+/*
+   Static functions.
+*/
 
 static int HandleErrorShader(ID3D10Blob* errorBlob)
 {
     if (errorBlob)
     {
         fprintf(stderr,
-                "Shader compilation failed!\n"
-                "==========================\n"
-                "%s"
-                "==========================\n",
-                reinterpret_cast<char *> (errorBlob->GetBufferPointer()));
+            "\nShader compilation failed! [error]:\n"
+            "========================\n"
+            "%s"
+            "========================\n",
+            (char *) (errorBlob->GetBufferPointer()));
         return 0;
     }
 
     return -1;
 }
 
-static Shader* ShaderLoad(ShaderLayout format, const char* vs, const char* fs)
+
+extern GFX_shader* ShaderLoad(ShaderLayout format, const char* vertexKey, const char* pixelKey)
 {
-    // source code into one large string.
-    char buf[4096];
-    snprintf(buf, 2048, "%s %s", vs, fs);
 
-    HRESULT hr = S_OK;
-
-    ID3D10Blob* vertexShaderBlob = NULL;
-    ID3D10Blob* pixelShaderBlob = NULL;
-    ID3D10Blob* errorBlob = NULL;
-
-    // Vertex shader.
-    // Blobs.
-    hr = D3DCompile(buf, strlen(buf), NULL, NULL, NULL, "VS", "vs_5_0", 0, 0, &vertexShaderBlob, &errorBlob);
-    if (FAILED(hr))
-    {
-        HandleErrorShader(errorBlob);
-        return NULL;
-    }
-
-    hr = D3DCompile(buf, strlen(buf), NULL, NULL, NULL, "PS", "ps_5_0", 0, 0, &pixelShaderBlob, &errorBlob);
-    if (FAILED(hr))
-    {
-        HandleErrorShader(errorBlob);
-        return NULL;
-    }
-    if (errorBlob) errorBlob->Release();
+    // HLSL file contains both the vertex shader and the fragment shader.
+    // We use 2 DX compiler calls to compile one HLSL file into two VS and PS-formatted
+    // shaders, which we'll then load.
 
     // Create shaders.
-    //ID3D11VertexShader* vertexShader;
-    //ID3D11PixelShader* pixelShader;
-    Shader* shd = new Shader;
+    GFX_shader* shd;
 
-    // Then compile the shaders.
-    d3device->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), NULL, &shd->vertexShader.vs);
-    d3device->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), NULL, &shd->pixelShader);
-
-    // Set input layout.
-    if (format == SHADER_LAYOUT_SKINNED_ANIMATION)
+    VertexShader vertexShader;
+    auto vs = shaderVsMap.find(vertexKey);
+    if (vs != shaderVsMap.end())
     {
-        D3D11_INPUT_ELEMENT_DESC layout[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TANGENTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "JOINTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "WEIGHTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        };
-        d3device->CreateInputLayout(layout, 7, vertexShaderBlob->GetBufferPointer(),
-            vertexShaderBlob->GetBufferSize(), &shd->vertexShader.inputLayout);
-
-    }
-    else if (format == SHADER_LAYOUT_FLATCOLOR)
-    {
-        D3D11_INPUT_ELEMENT_DESC layout[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        };
-        d3device->CreateInputLayout(layout, 2, vertexShaderBlob->GetBufferPointer(),
-            vertexShaderBlob->GetBufferSize(), &shd->vertexShader.inputLayout);
-
-    }
-    else if (format == SHADER_LAYOUT_BASIC_SHADED)
-    {
-        D3D11_INPUT_ELEMENT_DESC layout[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-         };
-        d3device->CreateInputLayout(layout, 4, vertexShaderBlob->GetBufferPointer(),
-            vertexShaderBlob->GetBufferSize(), &shd->vertexShader.inputLayout);
-
-        puts("Loaded shader!");
+        vertexShader = vs->second;
     }
     else
     {
-        fprintf(stderr, "%s: Invalid shader layout!\n", __func__);
-        _FREE(shd);
-        return NULL;
+        Asset* asset = AssetLoad(vertexKey);
+        if (asset == NULL)
+        {
+            fprintf(stderr, "Failed to load vertex shader! %s\n", vertexKey);
+            return NULL;
+        }
+
+        HRESULT hr = d3device->CreateVertexShader(asset->data, asset->size, NULL, &vertexShader.vs);
+        if (FAILED(hr))
+        {
+            fprintf(stderr, "Failed to create vertex shader! %s\n", vertexKey);
+            AssetClose(asset);
+            return NULL;
+        }
+
+        // Set input layout.
+        if (format == SHADER_LAYOUT_SKINNED_ANIMATION)
+        {
+            D3D11_INPUT_ELEMENT_DESC layout[] = {
+                { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "TEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "TANGENTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "JOINTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "WEIGHTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            };
+            d3device->CreateInputLayout(layout, 7, asset->data,
+                asset->size, &vertexShader.inputLayout);
+        }
+        else if (format == SHADER_LAYOUT_FLATCOLOR)
+        {
+            D3D11_INPUT_ELEMENT_DESC layout[] = {
+                { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            };
+            d3device->CreateInputLayout(layout, 2, asset->data,
+                asset->size, &vertexShader.inputLayout);
+
+        }
+        else if (format == SHADER_LAYOUT_BASIC_SHADED)
+        {
+            D3D11_INPUT_ELEMENT_DESC layout[] = {
+                { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "TEXCOORDS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+                { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            };
+            d3device->CreateInputLayout(layout, 4, asset->data,
+                asset->size, &vertexShader.inputLayout);
+        }
+        else
+        {
+            fprintf(stderr, "%s: Invalid shader layout!\n", __func__);
+            AssetClose(asset);
+            return NULL;
+        }
+
+        AssetClose(asset);
+
+        shaderVsMap.insert({ vertexKey, vertexShader });
     }
 
-    //immediateContext->IASetInputLayout(shd->vertexShader.inputLayout);
+    ID3D11PixelShader* pixelShader;
+    auto ps = shaderPsMap.find(pixelKey);
+    if (ps != shaderPsMap.end())
+    {
+        pixelShader = ps->second;
+    }
+    else
+    {
+        Asset* asset = AssetLoad(pixelKey);
+        if (asset == NULL)
+        {
+            fprintf(stderr, "Failed to load pixel shader! %s\n", pixelKey);
+            return NULL;
+        }
+        HRESULT hr = d3device->CreatePixelShader(asset->data, asset->size, NULL, &pixelShader);
+        if (FAILED(hr))
+        {
+            fprintf(stderr, "Failed to create pixel shader! %s\n", pixelKey);
+            AssetClose(asset);
+            return NULL;
+        }
+
+        AssetClose(asset);
+
+        shaderPsMap.insert({ pixelKey, pixelShader });
+    }
+
+    shd = new GFX_shader;
+    shd->vertexShader = vertexShader;
+    shd->pixelShader = pixelShader;
 
     return shd;
-
 }
 
-static void ShaderTerminate(Shader* shader)
+extern void ShaderTerminate(GFX_shader* shader)
 {
-    if (shader)
-    {
-        delete shader;
-    }
+    delete shader;
 }
-
-static int ShaderUse(Shader* shader)
+extern int ShaderUse(GFX_shader* shader)
 {
     if (shader)
     {
@@ -472,9 +369,17 @@ static int ShaderUse(Shader* shader)
 
         immediateContext->VSSetShader(shader->vertexShader.vs, NULL, 0);
         immediateContext->PSSetShader(shader->pixelShader, NULL, 0);
+
+        return 0;
     }
     return -1;
 }
+
+extern void ShaderSet(float value, int index)
+{
+    floatRegs[index] = value;
+}
+
 
 static void DoGamma(float* r, float* g, float* b)
 {
@@ -482,10 +387,6 @@ static void DoGamma(float* r, float* g, float* b)
     *g = 0.75f * (*g * *g) + 0.25f * *g * (*g * *g);
     *b = 0.75f * (*b * *b) + 0.25f * *b * (*b * *b);
 }
-
-/*
-   ...along with the shader uniform constants.
-*/
 
 static void CopyLight(DrawPass* pass, ConstantPsLight* dest, GFX_light* l, b32 pointSource)
 {
@@ -526,7 +427,6 @@ static void CopyLight(DrawPass* pass, ConstantPsLight* dest, GFX_light* l, b32 p
     dest->intensity = l->intensity;
 }
 
-
 static void SetNormalMat(void)
 {
     drawState.normalMat = drawState.matStack[drawState.matStackIdx];
@@ -542,14 +442,12 @@ static void SetScenePSConstants(void)
     D3D11_MAPPED_SUBRESOURCE mappedBuffer;
     immediateContext->Map(constantPSSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBuffer);
 
-    ConstantPsScene* scene = (ConstantPsScene *) mappedBuffer.pData;
-
+    ConstantPsScene* scene = static_cast<ConstantPsScene *> (mappedBuffer.pData);
     // Copy the lights.
     CopyLight(pass, &scene->dirLight, pass->dirLight, FALSE);
     for (int i = 0; i < DRAW_MAX_POINTLIGHTS; ++i) {
         CopyLight(pass, &scene->pointLights[i], &pass->pointLights[i], TRUE);
     }
-
     // Fog.
     float fog[3] = {
         ((fogColor >> 16) & 0xFF) / 255.0f,
@@ -574,7 +472,7 @@ static void Draw_SetConstants(mat4* model)
     D3D11_MAPPED_SUBRESOURCE matRes;
     immediateContext->Map(constantVSBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &matRes);
 
-    ConstantVS* mats = (ConstantVS *) (matRes.pData);
+    ConstantVs* mats = static_cast<ConstantVs *> (matRes.pData);
 
     // Fill modelview.
     if (model)
@@ -610,7 +508,7 @@ static void Draw_SetConstants(mat4* model)
     D3D11_MAPPED_SUBRESOURCE mappedPS;
     immediateContext->Map(constantPSBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedPS);
 
-    ConstantPS* ps = (ConstantPS *) (mappedPS.pData);
+    ConstantPs* ps = static_cast <ConstantPs *> (mappedPS.pData);
     for (int i = 0; i < DRAW_MAX_TEX; ++i)
     {
         ps->tex[i].offs[0] = drawState.tex[i].x;
@@ -619,6 +517,12 @@ static void Draw_SetConstants(mat4* model)
         ps->tex[i].scale[1] = drawState.tex[i].ys;
     }
     immediateContext->Unmap(constantPSBuffer, 0);
+
+    // Set up registers.
+    for (int i = 0; i < 16; ++i)
+    {
+        ps->regs.floatVars[i] = floatRegs[i];
+    }
 
     // -------------------------------------------------------------
     // Set up texture handlers.
@@ -631,6 +535,7 @@ static void Draw_SetConstants(mat4* model)
             textures[i] = NULL;
         }
     }
+
     immediateContext->PSSetShaderResources(0, drawState.nTex, textures);
     if (drawState.tex[0].tex && drawState.tex[0].tex->flags & TEXTURE_POINT)
     {
@@ -642,7 +547,7 @@ static void Draw_SetConstants(mat4* model)
     }
 
 
-    // Then link the constant buffers.
+    // Then link the constant buffers. (two buffers)
     immediateContext->VSSetConstantBuffers(0, 1, &constantVSBuffer);
     if (pass->flags & DRAW_PASS_FLAG_SCENE_CONSTANTS)
     {
@@ -655,6 +560,7 @@ static void Draw_SetConstants(mat4* model)
         //fprintf(stderr, "%s: Ok bro\n", __func__);
     }
 }
+
 
 
 static void DrawPrepare(void)
@@ -684,7 +590,6 @@ extern void DrawFlush(void)
 
         UINT stride = sizeof(CustomVertexDX11);
         UINT offset = 0;
-
 
         // TODO: bruhh this has to be the issue.
         immediateContext->IASetVertexBuffers(0, 1, &streamVertexBuffer, &stride, &offset);
@@ -770,7 +675,7 @@ extern void DrawIndices(int verts, int n, unsigned int const* st)
     int base = currNverts - verts;
     for (int i = 0; i < n; ++i)
     {
-        (static_cast<int *> (streamIndexMappedBuffer.pData))[currNindices++] = base + st[i];
+        ((int *) (streamIndexMappedBuffer.pData))[currNindices++] = base + st[i];
     }
 }
 
@@ -850,6 +755,7 @@ extern void DrawBlend(BlendMode blend)
 {
     if (drawState.blend != blend)
     {
+        // The issue is at draw flush.
         DrawFlush();
         drawState.blend = blend;
 
@@ -998,23 +904,17 @@ extern void DrawSetTarget(void)
 }
 
 // Uploads immutable data.
-extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* verts, void* indices, int nVertices)
+extern GFX_mesh* DrawUploadMesh(void* alloc, void* verts, void* indices, int nVertices)
 {
-    // TODO: Might be an issue.
-    //GFX_mesh* m = ArenaPushStruct(arena, GFX_mesh);
-    GFX_mesh* m = new GFX_mesh;
-    m->nElements = nVertices / 3;
-
-
+    puts("TODO: Implement DrawUploadMesh");
+    /*
     size_t vertexSize = sizeof(CustomVertexDX11);
 
     D3D11_BUFFER_DESC bd;
     ZeroMemory(&bd, sizeof(bd));
     bd.Usage = D3D11_USAGE_IMMUTABLE;
-    bd.ByteWidth = vertexSize * nVertices;
+    bd.ByteWidth = vertexSize * m->nvertices;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-
-    fprintf(stderr, "%s: buffer descriptor byte width: %d\n", __func__, bd.ByteWidth);
 
     D3D11_SUBRESOURCE_DATA subres;
     subres.pSysMem = verts;
@@ -1022,78 +922,64 @@ extern GFX_mesh* DrawUploadMesh(ARENA* arena, void* verts, void* indices, int nV
     subres.SysMemSlicePitch = 0;
 
     ID3D11Buffer* buffer;
-    if (FAILED(d3device->CreateBuffer(&bd, &subres, &buffer)))
+    if (FAILED(d3device->CreateBuffer(&bd, NULL, &buffer)))
     {
-        // TODO: Temporary arena buffer management.
-        fprintf(stderr, "%s: Failed to create vertex buffer!\n", __func__);
-        return NULL;
+        fprintf(stderr, "%s: Failed to create buffer!\n", __func__);
+        return -1;
     }
-    m->vertexData = buffer;
+    m->vertexBuffer = buffer;
 
-    bd.ByteWidth = m->nElements * 12;
+    bd.ByteWidth = m->nfaces * 12;
     bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
     subres.pSysMem = indices;
     subres.SysMemPitch = 4; // 4 bytes per integer.
-    if (FAILED(d3device->CreateBuffer(&bd, &subres, &buffer)))
+    if (FAILED(d3device->CreateBuffer(&bd, NULL, &buffer)))
     {
-        fprintf(stderr, "%s: Failed to create index buffer!\n", __func__);
-        return NULL;
+        fprintf(stderr, "%s: Failed to create buffer!\n", __func__);
+        return -1;
     }
+    m->indexBuffer = buffer;
+    */
 
-    m->indexData = buffer;
- 
-    return m;
+    return 0;
 }
 
-
-extern void ReleaseMesh(GFX_mesh* m)
+extern void DrawMeshTerminate(GFX_mesh* m)
 {
+    /*
     ID3D11Buffer* buf;
-    buf = reinterpret_cast<ID3D11Buffer *>(m->vertexData);
+    buf = (ID3D11Buffer *) m->vertexBuffer;
     buf->Release();
-    buf = reinterpret_cast<ID3D11Buffer *>(m->indexData);
+    buf = (ID3D11Buffer *) m->indexBuffer;
     buf->Release();
 
-    //MeshTerminate(m);
+    MeshTerminate(m);
+    */
 }
 
 extern void DrawRenderMesh(GFX_mesh* m)
 {
+    /*
     DrawFlush();
     Draw_SetConstants(&drawState.matStack[drawState.matStackIdx]);
 
-    ID3D11Buffer* verts = static_cast<ID3D11Buffer *>(m->vertexData);
-    ID3D11Buffer* indices = static_cast<ID3D11Buffer *>(m->indexData);
+    ID3D11Buffer* verts = (ID3D11Buffer *) m->vertices;
+    ID3D11Buffer* indices = (ID3D11Buffer *) m->indices;
 
-    UINT stride = sizeof(CustomVertexDX11);
+    UINT stride = sizeof(vertex_t);
     UINT offset = 0;
 
     immediateContext->IASetVertexBuffers(0, 1, &verts, &stride, &offset);
     immediateContext->IASetIndexBuffer(indices, DXGI_FORMAT_R32_UINT, 0);
     immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    immediateContext->DrawIndexed(m->nElements * 3, 0, 0);
-}
-
-extern void DrawMeshTerminate(GFX_mesh *mesh)
-{
-    if (mesh == NULL)
-    {
-        return;
-    }
-
-    ID3D11Buffer* buf;
-    buf = reinterpret_cast<ID3D11Buffer *>(mesh->vertexData);
-    buf->Release();
-    buf = reinterpret_cast<ID3D11Buffer *>(mesh->indexData);
-    buf->Release();
+    immediateContext->DrawIndexed(m->nfaces * 3, 0, 0);
+    */
 }
 
 
 static int CreateTargetSurface(TargetSurface* surface)
 {
-    fprintf(stderr, "Window Handle: %p its hwnd: %p\n", windowHandle, windowHandle->backend->hwnd);
-
-    // OHHHH THIS MIGHT BE THE ERROR!!
+    // We use the Window Handle.
     D3D11_TEXTURE2D_DESC texDesc = { 0 };
     texDesc.Width = windowHandle->w;
     texDesc.Height = windowHandle->h;
@@ -1162,7 +1048,7 @@ static int CreateTargetSurface(TargetSurface* surface)
     return 0;
 }
 
-//static void ReleaseTexture(GFX_texture* texture);
+extern void ReleaseTexture(GFX_texture* texture);
 
 static void DeleteTargetSurface(TargetSurface* surface)
 {
@@ -1174,54 +1060,15 @@ static void DeleteTargetSurface(TargetSurface* surface)
 
 static HRESULT InitDirect3D(Window* win)
 {
-    puts("Initializing DirectX11...");
+    fprintf(stderr, "%s: Initializing DirectX...\n", __func__);
 
     HRESULT hr = S_OK;
 
-    fprintf(stderr, "%s: Win handle hwnd: %p\n", __func__, win->backend->hwnd);
-    fprintf(stderr, "%s: window w: %d window h: %d\n", __func__, win->w, win->h);
+    //RECT rc;
+    //GetClientRect(win->backend->hwnd, &rc);
+    //UINT width = rc.right - rc.left;
+    //UINT height = rc.top - rc.bottom;
 
-    /*
-    DXGI_SWAP_CHAIN_DESC sd = { 0 };
-    sd.BufferCount = 2;
-    //sd.BufferDesc.Width = win->w;
-    //sd.BufferDesc.Height = win->h;
-    sd.BufferDesc.RefreshRate.Numerator = 0;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM; 
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    // Turn multisampling off.
-    sd.SampleDesc.Count = 1;
-    sd.SampleDesc.Quality = 0;
-
-    sd.OutputWindow = win->backend->hwnd;
-    sd.Windowed = TRUE;
-
-    // Set the scanline ordering and scaling to be unspecified.
-    //sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-    //sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-
-    // Discard the backbuffer contents after presenting.
-    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-    UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-//#ifndef RELEASE 
-    flags |= D3D11_CREATE_DEVICE_DEBUG;
-//#endif 
-
-
-    // We get our features and device with swapchain.
-    // It creates the device, device (immediate) context, and swapchain.
-    D3D_FEATURE_LEVEL featureLevel;
-    hr = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE,
-            0, flags, NULL, 0, D3D11_SDK_VERSION,
-            &sd, &pSwapchain, &d3device, &featureLevel, &immediateContext);
-    if (FAILED(hr))
-    {
-        fprintf(stderr, "%s: Failed to create device and swapchain!\n", __func__);
-        return hr;
-    }
-    */
 
     hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void **) &dxgiFactory);
     if (FAILED(hr))
@@ -1285,6 +1132,8 @@ static HRESULT InitDirect3D(Window* win)
     }
 
     fprintf(stderr, "%s: YOO win w:%d, win h:%d\n", __func__, win->w, win->h);
+    fprintf(stderr, "%s: hwnd: %p\n", __func__, win->backend->hwnd);
+
     // Get the adapter (video card) description.
     DXGI_ADAPTER_DESC adapterDesc;
     hr = dxgiAdapter->GetDesc(&adapterDesc);
@@ -1373,33 +1222,8 @@ static HRESULT InitDirect3D(Window* win)
     }
 
 
-    // Now try to debug this.
-    {
-        HRESULT reason = d3device->GetDeviceRemovedReason();
-        switch (reason)
-        {
-            case DXGI_ERROR_DEVICE_REMOVED:
-                puts("Graphics device removed!");
-                break;
-            case DXGI_ERROR_DEVICE_RESET:
-                puts("Graphics device reset!");
-                break;
-            case DXGI_ERROR_DEVICE_HUNG:
-                puts("Device hung!");
-                break;
-            case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
-                puts("Internal driver error!");
-                break;
-            default:
-                puts("No error found!");
-                break;
-        }
-    }
-
-
-
     // Create render target view.
-    hr = pSwapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**> (&framebuffer));
+    hr = pSwapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID *) &framebuffer);
     if (FAILED(hr))
     {
         fprintf(stderr, "%s: Couldn't get back buffer!\n", __func__);
@@ -1412,14 +1236,13 @@ static HRESULT InitDirect3D(Window* win)
     }
 
 
-    // TODO: The problem has to be some malformed buffers?
 
     // We reuse our descriptors.
     D3D11_BUFFER_DESC bufferDesc = { 0 };
     bufferDesc.ByteWidth = VERTEX_BUFFER_SIZE;
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // We write it using the CPU.
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     hr = d3device->CreateBuffer(&bufferDesc, NULL, &streamVertexBuffer);
     if (FAILED(hr))
     {
@@ -1438,7 +1261,7 @@ static HRESULT InitDirect3D(Window* win)
         return -1;
     }
 
-    bufferDesc.ByteWidth = sizeof(ConstantVS);
+    bufferDesc.ByteWidth = sizeof(ConstantVs);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -1449,7 +1272,7 @@ static HRESULT InitDirect3D(Window* win)
         return -1;
     }
 
-    bufferDesc.ByteWidth = sizeof(ConstantPS);
+    bufferDesc.ByteWidth = sizeof(ConstantPs);
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -1470,9 +1293,6 @@ static HRESULT InitDirect3D(Window* win)
         fprintf(stderr, "%s: Failed to create scene buffer!\n", __func__);
         return -1;
     }
-
-    // Init shaders.
-    //defaultShader = ShaderLoad(SHADER_LAYOUT_SKINNED_ANIMATION, color_vs, color_ps);
 
     // Rasterizers.
     D3D11_RASTERIZER_DESC rasterizerDesc;
@@ -1542,7 +1362,9 @@ static HRESULT InitDirect3D(Window* win)
     hr = d3device->CreateBlendState(&blendDesc, &blendStates[BLEND_SUBTRACT]);
 
 
-    drawState.blend = static_cast<BlendMode>(-1);
+    drawState.blend = static_cast <BlendMode> (-1);
+    _MEMSET(floatRegs, 0, sizeof(floatRegs));
+
 
     // Depth stencil.
     D3D11_DEPTH_STENCIL_DESC depthStencilDesc = { 0 };
@@ -1576,25 +1398,21 @@ static HRESULT InitDirect3D(Window* win)
 
     surface2.color.flags |= TEXTURE_POINT;
 
-    puts("alright");
-
     return S_OK;
 }
-
-
 
 
 /*
    Public interface.
 */
 
+// Do we serve any more spaghetti here?
 static DrawPass _passes[1] = { 0 };
-static mat4 viewMat = mat4{1.0f};
+static mat4 _viewMat = mat4{1.0f};
 
 extern int GraphicsInit(Window* win)
 {
-    // Create draw arena.
-    //drawState.drawArena = ArenaInit(MB(4), KB(4), ARENA_FLAG_GROWABLE);
+    drawState.drawArena = ArenaInit(MB(2), KB(64), ARENA_FLAG_GROWABLE);
 
     // Init graphics.
     if (FAILED(InitDirect3D(win)))
@@ -1603,28 +1421,24 @@ extern int GraphicsInit(Window* win)
         return -1;
     }
 
+    // UTAH EXAMPLE.
     DrawSetPipeline(1, _passes);
     DrawSetPass2D(&_passes[0]);
     _passes[0].active = TRUE;
-    _passes[0].viewMatrix = &viewMat;
+    _passes[0].viewMatrix = &_viewMat;
     _passes[0].flags |= DRAW_PASS_FLAG_GAMMA;
-
-    DrawReset();
     DrawSetTarget();
 
-    drawState.currentPass = 0;
-
     // Init shader and buffer.
-    defaultShader = ShaderLoad(SHADER_LAYOUT_BASIC_SHADED, color_vs, color_ps);
+    defaultShader = ShaderLoad(SHADER_LAYOUT_BASIC_SHADED, "assets/shaders/base.vso", "assets/shaders/base.pso");
     if (defaultShader == NULL)
     {
         fprintf(stderr, "%s: Failed to load shader!\n", __func__);
         return -1;
     }
 
-    return 0;
+     return 0;
 }
-
 
 extern void GraphicsTerminate(void)
 {
@@ -1663,6 +1477,7 @@ extern void GraphicsTerminate(void)
     //defaultShader->pixelShader->Release();
     ShaderTerminate(defaultShader);
 
+    //TextureTerminate(defaultSquareTexture);
     ////////////////////////////// 
 
 
@@ -1744,62 +1559,6 @@ extern void GraphicsTerminate(void)
    Texture functions.
 */
 
-extern void AllocateMutableTexture(int width, int height, void** args, int flags)
-{
-    // TODO: Soemthing.
-
-    /*
-    D3DFORMAT format = D3DFMT_X8R8G8B8;
-    if (flags & TEXTURE_ALPHA)
-    {
-        format = D3DFMT_A8R8G8B8;
-    }
-
-    // D3DPOOL_DEFAULT is for mutable textures,
-    // while D3DPOOL_MANAGED optimizes those textures if they're immutable.
-    d3device->CreateTexture(
-        width, height, 1, 1, format,
-        D3DPOOL_DEFAULT, reinterpret_cast<LPDIRECT3DTEXTURE9*>(args), NULL
-    );
-    */
-
-    D3D11_TEXTURE2D_DESC textureDesc;
-    ZeroMemory(&textureDesc, sizeof(textureDesc));
-    textureDesc.Width = width;
-    textureDesc.Height = height;
-    textureDesc.MipLevels = 1;
-    textureDesc.ArraySize = 1;
-    textureDesc.Format = (flags & TEXTURE_SRGB) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-    textureDesc.SampleDesc.Count = 1;
-    //textureDesc.SampleDesc.Quality = 1;
-    textureDesc.Usage = D3D11_USAGE_IMMUTABLE;
-    textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    textureDesc.MiscFlags = 0;
-    // We use mipmapping by default?
-    if (flags & TEXTURE_MIPMAP)
-    {
-        textureDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-        textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-        textureDesc.Usage = D3D11_USAGE_DEFAULT;
-        textureDesc.MipLevels = 1;
-    }
-
-    D3D11_SUBRESOURCE_DATA textureData;
-    textureData.pSysMem = NULL;
-    textureData.SysMemPitch = width * 4;
-
-    ID3D11Texture2D* texture2D;
-    HRESULT hr = d3device->CreateTexture2D(&textureDesc, &textureData, &texture2D);
-    if (FAILED(hr))
-    {
-        fprintf(stderr, "%s: Failed to load immutable texture!\n", __func__);
-        return;
-    }
-
-}
-
-
-
 extern GFX_texture* LoadImmutableTextureFromPixels(void* alloc, int w, int h, unsigned char* pix, int flags)
 {
     D3D11_TEXTURE2D_DESC textureDesc;
@@ -1849,19 +1608,7 @@ extern GFX_texture* LoadImmutableTextureFromPixels(void* alloc, int w, int h, un
         immediateContext->GenerateMips(resourceView);
     }
 
-    //TEXTURE* tex = (TEXTURE *) _MALLOC(sizeof(TEXTURE));
-    // Literally.
-    GFX_texture* tex;
-    if (alloc)
-    {
-        //ARENA* arena = reinterpret_cast<ARENA *>(alloc);
-        //tex = ArenaPushStruct(arena, GFX_texture);
-    }
-    else
-    {
-        tex = (GFX_texture *) _MALLOC(sizeof(GFX_texture));
-    }
-
+    GFX_texture* tex = (GFX_texture *) _MALLOC(sizeof(GFX_texture));
     tex->w = w;
     tex->h = h;
     tex->flags = flags;
@@ -1872,13 +1619,8 @@ extern GFX_texture* LoadImmutableTextureFromPixels(void* alloc, int w, int h, un
     return tex;
 }
 
-extern void ReleaseTexture(GFX_texture* texture)
+extern void ReleaseTexture(GFX_texture *texture)
 {
-    if (texture == NULL)
-    {
-        return;
-    }
-
     ID3D11ShaderResourceView* resView = (ID3D11ShaderResourceView *) texture->resourceView;
     if (resView)
     {
@@ -1892,9 +1634,9 @@ extern void ReleaseTexture(GFX_texture* texture)
     texture->handle = NULL;
 }
 
-extern void TextureTerminate(void* alloc, GFX_texture* texture)
+extern void TextureTerminate(void* alloc, GFX_texture *texture)
 {
-    if (texture == NULL)
+    if (!texture)
     {
         return;
     }
@@ -1906,11 +1648,127 @@ extern void TextureTerminate(void* alloc, GFX_texture* texture)
     }
 
     ReleaseTexture(texture);
-    if (alloc)
-    {
-    }
-    else
-    {
-        delete texture;
-    }
+    _FREE(texture);
 }
+
+
+extern GFX_texture* AllocateMutableTexture(int width, int height, void* args, int flags)
+{
+    D3D11_TEXTURE2D_DESC textureDesc = { 0 };
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    textureDesc.MipLevels = 1;
+    textureDesc.ArraySize = 1;
+    textureDesc.Format = (flags & TEXTURE_SRGB) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.Usage = D3D11_USAGE_DYNAMIC;
+    textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    textureDesc.MiscFlags = 0;
+
+    // No mipmap generation for dynamic textures, sorry!
+
+
+    //D3D11_SUBRESOURCE_DATA textureData = { 0 };
+    //textureData.pSysMem = NULL;
+    //textureData.SysMemPitch = width * 4;
+
+    ID3D11Texture2D* texture2D;
+    HRESULT hr = d3device->CreateTexture2D(&textureDesc, NULL, &texture2D);
+    if (FAILED(hr))
+    {
+        fprintf(stderr, "%s: Failed to load dynamic texture!\n", __func__);
+        return NULL;
+    }
+
+
+    ID3D11ShaderResourceView* resourceView;
+    hr = d3device->CreateShaderResourceView(texture2D, NULL, &resourceView);
+    if (FAILED(hr))
+    {
+        fprintf(stderr, "%s: Failed to load shader resource view!\n", __func__);
+        return NULL;
+    }
+
+
+    GFX_texture* tex = (GFX_texture *) _MALLOC(sizeof(GFX_texture));
+    tex->w = width;
+    tex->h = height;
+    tex->flags = flags;
+    tex->refs = 1;
+    tex->handle = texture2D;
+    tex->resourceView = resourceView;
+
+    return tex;
+
+}
+
+extern unsigned char* TextureLock(
+    GFX_texture* texture, unsigned int* rowPitch, unsigned int* depthPitch)
+{
+    ID3D11Texture2D* tex = static_cast<ID3D11Texture2D *> (texture->handle);
+
+    D3D11_MAPPED_SUBRESOURCE mappedBuffer;
+    immediateContext->Map(tex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedBuffer);
+
+    unsigned char* result = static_cast<unsigned char *> (mappedBuffer.pData);
+    if (rowPitch) *rowPitch = mappedBuffer.RowPitch;
+    if (depthPitch) *depthPitch = mappedBuffer.DepthPitch;
+
+    return result;
+}
+
+extern void TextureUnlock(GFX_texture* texture)
+{
+    ID3D11Texture2D* tex = static_cast<ID3D11Texture2D *> (texture->handle);
+
+    immediateContext->Unmap(tex, 0);
+}
+
+/*
+   3D textures.
+*/
+
+extern GFX_texture3D* AllocateMutableTexture3D(int width, int height, int depth, void* args, int flags)
+{
+    D3D11_TEXTURE3D_DESC textureDesc = { 0 };
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    textureDesc.Depth = depth;
+
+    textureDesc.MipLevels = 1;
+    textureDesc.Format = (flags & TEXTURE_SRGB) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+    textureDesc.Usage = D3D11_USAGE_DYNAMIC;
+    textureDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    textureDesc.MiscFlags = 0;
+
+    ID3D11Texture3D* texture3D;
+    HRESULT hr = d3device->CreateTexture3D(&textureDesc, NULL, &texture3D);
+    if (FAILED(hr))
+    {
+        fprintf(stderr, "%s: Failed to load dynamic 3D texture!\n", __func__);
+        return NULL;
+    }
+
+
+    ID3D11ShaderResourceView* resourceView;
+    hr = d3device->CreateShaderResourceView(texture3D, NULL, &resourceView);
+    if (FAILED(hr))
+    {
+        fprintf(stderr, "%s: Failed to load shader resource view!\n", __func__);
+        return NULL;
+    }
+
+
+    GFX_texture3D* tex = (GFX_texture3D *) _MALLOC(sizeof(GFX_texture3D));
+    tex->w = width;
+    tex->h = height;
+    tex->flags = flags;
+    tex->refs = 1;
+    tex->handle = texture3D;
+    tex->resourceView = resourceView;
+
+    return tex;
+}
+

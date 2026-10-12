@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+static const char assetDir[] = "assets/";
+
 #define ASSETS_ARCHIVE_COUNT 4
 
 typedef struct LoadedArchive {
@@ -21,6 +23,20 @@ static LoadedArchive archives[ASSETS_ARCHIVE_COUNT];
 
 static int TryLoadFile(const char* path, void** dataBuf, int* size)
 {
+    // Add relative path.
+    char tmpPathBuf[260];
+    int len = snprintf(tmpPathBuf, 260, "assets/%s", path);
+
+#if defined(_WIN32) || defined(_WIN64)
+    char* ptr = tmpPathBuf;
+    while (*ptr)
+    {
+        if (*ptr == '\\') *ptr = '/';
+        ptr++;
+    }
+#endif
+    fprintf(stderr, "%s: tmpPathBuf: %.*s\n", __func__, len, tmpPathBuf);
+
     FILE* fp = NULL;
     void* buf = NULL;
     int sz;
@@ -37,6 +53,7 @@ static int TryLoadFile(const char* path, void** dataBuf, int* size)
 
     fread(buf, sz, 1, fp);
     fclose(fp);
+    fp = NULL;
 
     if (dataBuf != NULL) *dataBuf = buf;
     if (size != NULL) *size = sz;
@@ -45,6 +62,7 @@ static int TryLoadFile(const char* path, void** dataBuf, int* size)
 err:
     if (buf != NULL) free(buf);
     if (fp != NULL) fclose(fp);
+    fp = NULL;
     return FALSE;
 }
 
@@ -63,16 +81,11 @@ static int TryLoadAsset(const char* filePath, void** data, i32* compSize, int* d
 
     if (filePath)
     {
-        char buf[256];
-        // TODO: Remove asset directory assets/ from search.
-        //fprintf(stderr, "%s: comp offset: %d uncomp offset: %d\n", __func__, arch->header.compressedOffset, arch->header.uncompressedOffset);
-
         if (arch->isCompressed) {
             fseek(arch->fp, arch->header.compressedOffset, SEEK_SET);
         } else {
             fseek(arch->fp, arch->header.uncompressedOffset, SEEK_SET);
         }
-
 
         int foundInArchive = FALSE;
         AssetFileData fileData;
@@ -82,7 +95,7 @@ static int TryLoadAsset(const char* filePath, void** data, i32* compSize, int* d
             fread(&fileData, 1, sizeof(AssetFileData), arch->fp);
 
             // Check if it corresponds.
-            if (!memcmp(fileData.name, filePath, strlen(filePath)))
+            if (!strcmp(fileData.name, filePath))
             {
                 foundInArchive = TRUE;
                 break;
@@ -121,7 +134,7 @@ static int TryLoadAsset(const char* filePath, void** data, i32* compSize, int* d
             {
                 char* tmp = new char[fileData.uncompressedSize];
                 fread(tmp, 1, fileData.uncompressedSize, arch->fp);
-                //fprintf(stderr, "%s: Doing some things\n", __func__);
+                fprintf(stderr, "%s: Doing some things\n", __func__);
 
                 *data = tmp;
             }
@@ -156,7 +169,7 @@ extern Asset* AssetLoad(const char* filePath)
 
     int i;
     b32 found = TryLoadFile(filePath, &data, &compSize);
-    for (i = 0; i < ASSETS_ARCHIVE_COUNT && !found; ++i)
+    for (i = 0; i < ASSETS_ARCHIVE_COUNT && !found; ++i) // If it wasn't found in a file before.
     {
         found = TryLoadAsset(filePath, &data, &compSize, &decompressedSize, i);
     }
@@ -173,7 +186,8 @@ extern Asset* AssetLoad(const char* filePath)
 
     Asset* asset = new Asset;
     asset->data = data;
-    asset->size = decompressedSize;
+    asset->size = (decompressedSize == 0) ? compSize : decompressedSize;
+
 
     return asset;
 }
@@ -206,7 +220,6 @@ extern int AssetArchive(int slot, const char* filePath)
 
     if (filePath)
     {
-
         arch->fp = fopen(filePath, "rb");
         if (arch->fp == NULL)
         {
