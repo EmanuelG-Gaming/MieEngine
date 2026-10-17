@@ -115,3 +115,22 @@ float4 PS(PixelInputType input) : SV_TARGET {
     //return input.color;
     //return float4(1, 1, 0, 1);
 }
+
+// Pixel shader. (I could do multiple targets in a single file, maybe)
+float4 Distort_PS(PixelInputType input) : SV_TARGET {
+    //return base_texture.Sample(my_sampler, input.texCoords) * input.color;
+    float4 s = texture1.Sample(my_sampler, input.texCoords);
+    float2 distortSample = s.rg + s.gb + s.ba + s.ar;
+
+    float distortionStrength = 10000.0f;
+
+    // The range [0.0, 1.0] would become [-0.5, -0.5].
+    float2 offset = (distortSample - 0.5f) * 2.0f;
+    float2 distortedUV = input.texCoords + (offset * distortionStrength);
+
+    float4 finalColor = (base_texture.Sample(my_sampler, input.texCoords));
+    finalColor = finalColor * input.color;
+    //float4 finalColor = float4(1.0f, 1.0f, 0.0f, 1.0f);
+
+    return finalColor;
+}

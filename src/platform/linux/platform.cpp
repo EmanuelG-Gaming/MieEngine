@@ -1,4 +1,4 @@
-#include "../platform.h"
+#include "platform/platform.h"
 
 #include <sys/mman.h>
 #include <unistd.h>

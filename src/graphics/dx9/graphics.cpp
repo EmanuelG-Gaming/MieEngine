@@ -1,6 +1,6 @@
-#include "../draw.h"
-#include "../../base/base_log.h"
-#include "../../win/win.h"
+#include "graphics/draw.h"
+#include "base/base_log.h"
+#include "win/win.h"
 
 /*
    I mean, there was also an utility library
@@ -8,6 +8,17 @@
    to draw text more easily,
    but it's not included in modern Windows SDK.
 */
+
+
+#if _MSC_VER
+#pragma comment(lib, "uuid")
+#pragma comment(lib, "dxguid")
+#pragma comment(lib, "d3dcompiler")
+#pragma comment(lib, "dxgi")
+
+#pragma comment(lib, "d3d9")
+#endif
+
 
 #include <d3d9.h>
 #include <d3d9types.h>

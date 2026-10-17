@@ -1,5 +1,5 @@
-#include "asset.h"
-#include "../base/base_log.h"
+#include "io/asset.h"
+#include "base/base_log.h"
 
 #include "../../ext/lzss.h"
 
@@ -17,8 +17,6 @@ typedef struct LoadedArchive {
 } LoadedArchive;
 
 static LoadedArchive archives[ASSETS_ARCHIVE_COUNT];
-//static int archiveCount = 0;
-
 
 
 static int TryLoadFile(const char* path, void** dataBuf, int* size)
@@ -35,7 +33,6 @@ static int TryLoadFile(const char* path, void** dataBuf, int* size)
         ptr++;
     }
 #endif
-    fprintf(stderr, "%s: tmpPathBuf: %.*s\n", __func__, len, tmpPathBuf);
 
     FILE* fp = NULL;
     void* buf = NULL;
@@ -43,6 +40,8 @@ static int TryLoadFile(const char* path, void** dataBuf, int* size)
 
     fp = fopen(path, "rb");
     if (fp == NULL) goto err;
+
+    fprintf(stderr, "Loaded file!! path=%s\n", path);
 
     fseek(fp, 0, SEEK_END);
     sz = ftell(fp);
@@ -97,6 +96,7 @@ static int TryLoadAsset(const char* filePath, void** data, i32* compSize, int* d
             // Check if it corresponds.
             if (!strcmp(fileData.name, filePath))
             {
+                fprintf(stderr, "%s: Found an asset at path: %s cmp: %s!\n", __func__, filePath, fileData.name);
                 foundInArchive = TRUE;
                 break;
             }
@@ -134,7 +134,6 @@ static int TryLoadAsset(const char* filePath, void** data, i32* compSize, int* d
             {
                 char* tmp = new char[fileData.uncompressedSize];
                 fread(tmp, 1, fileData.uncompressedSize, arch->fp);
-                fprintf(stderr, "%s: Doing some things\n", __func__);
 
                 *data = tmp;
             }
@@ -176,7 +175,7 @@ extern Asset* AssetLoad(const char* filePath)
 
     if (!found)
     {
-        fprintf(stderr, "Couldn't find entry at: %s\n", filePath);
+        fprintf(stderr, "Couldn't find file entry at: %s\n", filePath);
         return NULL;
     }
 
@@ -191,23 +190,6 @@ extern Asset* AssetLoad(const char* filePath)
 
     return asset;
 }
-
-/*
-extern Asset* AssetLoadFromArchive(ARENA* arena, const char* filePath, int slot)
-{
-    void* data = NULL;
-    if (TryLoadAsset(filePath, &data, NULL, slot))
-    {
-        LogErrorEmitF("Failed to load asset from archive at slot %d from path %s", slot, filePath);
-        return NULL;
-    }
-
-    return data;
-}
-*/
-
-
-
 
 extern int AssetArchive(int slot, const char* filePath)
 {
@@ -248,38 +230,6 @@ extern int AssetArchive(int slot, const char* filePath)
     }
 
     return 0;
-
-    /*
-    // Check if matching paths exist.
-    int pathFound = FALSE;
-    for (int i = 0; i < archiveCount; ++i)
-    {
-        LoadedArchive* arch = &archives[i];
-        if (!strcmp(filePath, arch->path))
-        {
-            LogErrorEmitF("Asset archive already loaded at path: %s", filePath);
-            fclose(fp);
-            return -1;
-        }
-    }
-
-    AssetArchiveHeader header;
-    strcpy(header.magic, magic);
-    fread(&header.fileCount, 1, sizeof(i32), fp);
-    fread(&header.compressedOffset, 1, sizeof(i32), fp);
-    fread(&header.uncompressedOffset, 1, sizeof(i32), fp);
-    // Go back to beginning.
-    rewind(fp);
-
-    LoadedArchive* arch = &archives[archiveCount];
-    arch->fp = fp;
-    arch->header = header;
-    arch->path = filePath;
-
-    archiveCount++;
-
-    return 0;
-    */
 }
 
 extern void AssetArchiveTerminate(void)

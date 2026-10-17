@@ -1,6 +1,6 @@
-#include "image.h"
-#include "../../base/base_defs.h"
-#include "../../base/math/base_rng.h"
+#include "graphics/image/image.h"
+#include "base/base_defs.h"
+#include "base/math/base_rng.h"
 
 #include <string.h>
 #include <stdio.h>

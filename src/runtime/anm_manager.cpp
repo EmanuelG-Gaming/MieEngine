@@ -1,9 +1,10 @@
-#include "anm_manager.h"
+#include "runtime/anm_manager.h"
 //#include "../platform/platform.h"
-#include "../io/asset.h"
-#include "anm_vm.h"
-#include "../base/base_string.h"
-#include "../platform/platform.h"
+#include "io/asset.h"
+#include "runtime/anm_vm.h"
+
+#include "base/base_string.h"
+#include "platform/platform.h"
 
 #include <stddef.h>
 

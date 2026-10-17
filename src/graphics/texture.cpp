@@ -1,10 +1,10 @@
-#include "texture.h"
-#include "../io/asset.h"
-#include "../base/base_log.h"
+#include "graphics/texture.h"
+#include "io/asset.h"
+#include "base/base_log.h"
 
 // We use STB_image.
 #define STB_IMAGE_IMPLEMENTATION
-#include "image/stb_image.h"
+#include "graphics/image/stb_image.h"
 
 
 extern int LoadPixels(int* w, int* h, unsigned char** data, int* channels, const char* assetPath, int flags)

@@ -325,6 +325,10 @@ int WindowTesting(void)
     // Begin logging things.
     LogFrameBegin();
 
+    // Initialize first.
+    AssetArchive(0, "assets.bin");
+
+
     // More bytes neeeded.
     ARENA* arena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
     Window* window = WindowInit(L"Testing window", 640*1.5, 480*1.5);
@@ -334,8 +338,6 @@ int WindowTesting(void)
 
 
     //AudioInit(window);
-
-    AssetArchive(0, "assets.bin");
 
     // TODO: Fix for arena.
 
@@ -359,8 +361,8 @@ int WindowTesting(void)
 
     GFX_font* font2 = FontInit(arena);
     FontAtlasPage* page2 = FontPageInit(font2, 0);
-    FontLoadTTF(font2, 0, "assets/fonts/Exo-Bold.ttf");
-    //FontLoadTTF(font2, 0, "assets/fonts/Charakterny.ttf");
+    //FontLoadTTF(font2, 0, "assets/fonts/Exo-Bold.ttf");
+    FontLoadTTF(font2, 0, "assets/fonts/Charakterny.ttf");
 
 
     GFX_texture* fontTex2 = FontUploadTexture(font2, 0);
@@ -410,7 +412,7 @@ int WindowTesting(void)
         fireBuffer[x] = 36;
     }
 
-    GFX_shader* distortionShader = ShaderLoad(SHADER_LAYOUT_BASIC_SHADED, "assets/shaders/distort.vso", "assets/shaders/distort.pso");
+    //GFX_shader* distortionShader = ShaderLoad(SHADER_LAYOUT_BASIC_SHADED, "assets/shaders/base.vso", "assets/shaders/distort.pso");
 
     // Load flashing images.
     // Might use some procedurally-generated glitch textures.
@@ -466,8 +468,8 @@ int WindowTesting(void)
        ANM logic.
     */
 
-    g_anmManager = (AnmManager *) malloc(sizeof(AnmManager));
-    AnmVM* allocVm = AnmManager::allocateVm();
+    //g_anmManager = (AnmManager *) malloc(sizeof(AnmManager));
+    //AnmVM* allocVm = AnmManager::allocateVm();
 
     AnmVM_rawInstr instr[] = {
         // If the bit at the varMask is 1, then it's a literal.
@@ -756,10 +758,11 @@ int WindowTesting(void)
             DrawTexture(1, sinisterTex);
             DrawTexture(0, fireTex);
 
-            ShaderUse(distortionShader);
+            //ShaderUse(distortionShader);
 
             DrawMatIdentity();
-            DrawMatRotate3D(0, 0, -PI*0.5);
+            DrawMatRotate3D(0, 0, -PI);
+
             DrawRect(2, 2);
             DrawMatIdentity();
 
@@ -838,8 +841,8 @@ int WindowTesting(void)
                 DrawBlend(BLEND_ADD);
 
                 mat4 mat { 1.0f };
-                mat.c[3] = 50.0f;
-                mat.c[7] = -20.0f;
+                mat.v[0] = vec4 { 0.4f, -0.4f, 0.0f, 0.0f };
+                mat.v[1] = vec4 { 0.0f, 1.0f, 0.0f, 0.0f };
 
                 DrawSetMatrix(mat.c);
                 //DrawMatTranslate(-0.5f, 0.5);

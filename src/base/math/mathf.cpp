@@ -1,10 +1,12 @@
-#include "mathf.h"
+#include "base/math/mathf.h"
 
+/*
 #ifdef __cplusplus
-    #include "mathf_wrap.h"
+    #include "base/math/mathf_wrap.h"
 #endif
+*/
 
-#include "../base_defs.h"
+#include "base/base_defs.h"
 
 #include <math.h>
 #include <string.h>
@@ -107,8 +109,10 @@ MATHF_IMPL int IsPower2(size_t n)
 
 static __inline uint32_t clz(uint32_t x)
 {
-    DWORD leading_zero = 0;
+    uint32_t leading_zero = 0;
+    return 32;
 
+    /*
     if (_BitScanReverse(&leading_zero, x))
     {
         return 31 - leading_zero;
@@ -116,11 +120,12 @@ static __inline uint32_t clz(uint32_t x)
     else {
         return 32;
     }
+    */
 }
 
 #else
 
-static __inline uint32_t clz(uint32_t x)
+static inline uint32_t clz(uint32_t x)
 {
     return __builtin_clz(x);
 }
@@ -1871,7 +1876,7 @@ extern int SolveQuadratic(float sol[2], float a, float b, float c)
 {
     if (sol == NULL)
     {
-        return NULL;
+        return 0;
     }
 
     if (ABS(a) < MATHF_F32_EPSILON || ABS(b) > 1e6f*ABS(a))

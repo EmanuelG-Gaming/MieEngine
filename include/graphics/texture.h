@@ -1,0 +1,60 @@
+#ifndef TEXTURE_H_
+#define TEXTURE_H_ 1
+
+//#include "../mem/arena.h"
+
+#define TEXTURE_POINT 1
+#define TEXTURE_SRGB 2
+#define TEXTURE_MIPMAP 4
+#define TEXTURE_ALPHA 8
+#define TEXTURE_HI_BIT 16
+
+
+typedef struct GFX_texture {
+    void* handle;
+    void* resourceView;
+
+    int w, h;
+    int refs;
+    int flags;
+} GFX_texture;
+
+typedef struct GFX_texture3D {
+    void* handle;
+    void* resourceView;
+
+    int w, h, d;
+    int refs;
+    int flags;
+} GFX_texture3D;
+
+/*
+   2D textures.
+*/
+
+extern int LoadPixels(int* w, int* h, unsigned char** data, int* channels, const char* assetPath, int flags);
+extern GFX_texture* LoadTexture(void* alloc, const char* assetPath, int flags = 0);
+
+extern GFX_texture* AllocateMutableTexture(int width, int height, void* alloc, int flags = 0);
+extern unsigned char* TextureLock(GFX_texture* texture, unsigned int* rowPitch, unsigned int* depthPitch);
+extern void TextureUnlock(GFX_texture* texture);
+
+// We load some texture here.
+extern GFX_texture* LoadImmutableTextureFromPixels(void* alloc, int w, int h, unsigned char* pix, int flags = 0);
+
+extern void ReleaseTexture(GFX_texture* texture);
+extern void TextureTerminate(void* alloc, GFX_texture* texture);
+
+/*
+   3D textures.
+*/
+
+extern GFX_texture3D* AllocateMutableTexture3D(int width, int height, int depth, void* alloc, int flags = 0);
+extern unsigned char* Texture3DLock(GFX_texture3D* texture, unsigned int* rowPitch, unsigned int* depthPitch);
+extern void Texture3DUnlock(GFX_texture3D* texture);
+
+extern void ReleaseTexture3D(GFX_texture3D* texture);
+extern void TextureTerminate3D(GFX_texture3D* texture);
+
+
+#endif /* TEXTURE_H_ */

@@ -1,13 +1,13 @@
-#include "../../base/base_defs.h"
-#include "../../base/math/mathf.h"
+#include "base/base_defs.h"
+#include "base/math/mathf.h"
 
 //#include "draw3d.h"
 //#include "model.h"
 //#include "texture.h"
 //#include "font.h"
 
-#include "../draw.h"
-#include "../../io/asset.h"
+#include "graphics/draw.h"
+#include "io/asset.h"
 
 
 #include <stdio.h>
@@ -15,10 +15,22 @@
 
 #include <map>
 
-#include "../../win/win32/window.cpp"
+//#include "../../win/win32/window.cpp"
+
 
 #include <d3d11.h>
 //#include <d3dcompiler.h>
+
+
+#if _MSC_VER
+#pragma comment(lib, "uuid")
+#pragma comment(lib, "dxguid")
+#pragma comment(lib, "d3dcompiler")
+#pragma comment(lib, "dxgi")
+
+#pragma comment(lib, "d3d11")
+#endif
+
 
 // Ok.
 //#define FULLSCREEN 0
@@ -183,7 +195,7 @@ static float floatRegs[16];
 */
 //static MESH utahTeapot;
 typedef struct GFX_shader GFX_shader;
-static GFX_shader* defaultShader = NULL;
+GFX_shader* defaultShader = NULL;
 
 
 
@@ -1131,8 +1143,8 @@ static HRESULT InitDirect3D(Window* win)
         }
     }
 
-    fprintf(stderr, "%s: YOO win w:%d, win h:%d\n", __func__, win->w, win->h);
-    fprintf(stderr, "%s: hwnd: %p\n", __func__, win->backend->hwnd);
+    //fprintf(stderr, "%s: YOO win w:%d, win h:%d\n", __func__, win->w, win->h);
+    //fprintf(stderr, "%s: hwnd: %p\n", __func__, win->backend->hwnd);
 
     // Get the adapter (video card) description.
     DXGI_ADAPTER_DESC adapterDesc;
@@ -1171,6 +1183,8 @@ static HRESULT InitDirect3D(Window* win)
     dxgiFactory = 0;
 
 
+    HWND handleWin = static_cast<HWND>(win->user);
+
     // Then the swapchain.
     DXGI_SWAP_CHAIN_DESC sd;
     ZeroMemory(&sd, sizeof(sd));
@@ -1187,11 +1201,12 @@ static HRESULT InitDirect3D(Window* win)
     //    sd.BufferDesc.RefreshRate.Denominator = 1;
     //}
     sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = win->backend->hwnd;
+    sd.OutputWindow = handleWin;
+
     // Turn multisampling off.
     sd.SampleDesc.Count = 1;
     sd.SampleDesc.Quality = 0;
-    fprintf(stderr, "hwnd: %p\n", win->backend->hwnd);
+    //fprintf(stderr, "hwnd: %p\n", win->backend->hwnd);
 
 #define FULLSCREEN 0
     if (FULLSCREEN) {
@@ -1430,7 +1445,7 @@ extern int GraphicsInit(Window* win)
     DrawSetTarget();
 
     // Init shader and buffer.
-    defaultShader = ShaderLoad(SHADER_LAYOUT_BASIC_SHADED, "assets/shaders/base.vso", "assets/shaders/base.pso");
+    defaultShader = ShaderLoad(SHADER_LAYOUT_BASIC_SHADED, "shaders/base.vso", "shaders/base.pso");
     if (defaultShader == NULL)
     {
         fprintf(stderr, "%s: Failed to load shader!\n", __func__);

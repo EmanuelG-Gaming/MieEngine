@@ -1,7 +1,25 @@
-#include "../win.h"
+/*
+   TODO: You have to define these
+   compile-time args BEFORE you #include <windows.h>.
+*/
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+#define _UNICODE
+#include <windows.h>
+#include <minwinbase.h>
+
+//#include <d3d11.h>
+//#include <d3dcompiler.h>
+#endif /* _WIN32 */
+
+#include "win/win.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+
+
 
 /*
 #define NOMINMAX
@@ -18,10 +36,9 @@
 #include <winnt.h>
 #include <winuser.h>
 
-#include "../../platform/platform.h"
+#include "platform/platform.h"
 
-//#include "../../platform/win32/platform.h"
-#include "../../base/base_log.h"
+#include "base/base_log.h"
 
 #define WIN_CLASS_NAME L"CustomWindow"
 
@@ -168,7 +185,7 @@ extern Window* WindowInit(const wchar_t* title, int width, int height)
 {
     PlatformInit();
 
-    LogInfo("Initializing window!\n");
+    //LogInfo("Initializing window!\n");
 
     if (!windowInitialized)
     {
@@ -367,7 +384,7 @@ extern float GetMouseYPosition(void)
    Window.
 */
 
-extern _inline int WindowOpened(Window* win)
+extern int WindowOpened(Window* win)
 {
     return (win->flags & WIN_FLAG_SHOULD_CLOSE) == 0;
 }

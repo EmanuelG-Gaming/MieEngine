@@ -1,9 +1,9 @@
-#include "draw.h"
-#include "../base/math/mathf.h"
-#include "../base/math/mathf_wrap.h"
+#include "graphics/draw.h"
+#include "base/math/mathf.h"
 
 #include <string.h>
 #include <math.h>
+
 
 #define ROTATION_3D 1
 
@@ -78,7 +78,7 @@ extern int DrawMatRotate3D(float x, float y, float z)
 
 extern int DrawSetMatrix(float* mat)
 {
-    mat4* m = &drawState.matStack[drawState.matStackIdx];
+    float* m = drawState.matStack[drawState.matStackIdx].c;
     for (int i = 0; i < 16; ++i)
     {
         m[i] = mat[i];

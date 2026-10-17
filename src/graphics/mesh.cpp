@@ -1,7 +1,7 @@
-#include "mesh.h"
-#include "../base/base_log.h"
+#include "graphics/mesh.h"
+#include "base/base_log.h"
 
-#include "draw.h"
+#include "graphics/draw.h"
 
 
 extern int MeshBuilderInit(MeshBuilder* mesh, ARENA* arena)

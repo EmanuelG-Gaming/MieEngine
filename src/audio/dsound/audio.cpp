@@ -1,7 +1,13 @@
-#include "../audio.h"
-#include "../../base/base_log.h"
-#include "../../win/win.h"
-#include "../../mem/arena.h"
+#include "audio/audio.h"
+
+
+#include "base/base_log.h"
+#include "win/win.h"
+#include "mem/arena.h"
+
+//#include "../../base/base_log.h"
+//#include "../../win/win.h"
+//#include "../../mem/arena.h"
 
 #include <windows.h>
 // For .wav file loading.

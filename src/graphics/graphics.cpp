@@ -1,4 +1,4 @@
-#include "../base/base_defs.h"
+#include "base/base_defs.h"
 
 #define GFX_USE_DX11
 

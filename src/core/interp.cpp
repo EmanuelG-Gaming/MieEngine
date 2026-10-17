@@ -1,7 +1,7 @@
-#include "interp.h"
+#include "core/interp.h"
 
 template <typename T>
-T Interp<T>::step(Interp<T>* self)
+void Interp<T>::step(Interp<T>* self)
 {
     if (self->endTime > 0)
     {
@@ -58,8 +58,6 @@ T Interp<T>::step(Interp<T>* self)
             self->initial = self->initial + offset;
         } break;
     }
-
-    return self->goal;
 }
 
 template <typename T>

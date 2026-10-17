@@ -1,5 +1,5 @@
-#include "platform.h"
-#include "../base/base_defs.h"
+#include "platform/platform.h"
+#include "base/base_defs.h"
 
 
 

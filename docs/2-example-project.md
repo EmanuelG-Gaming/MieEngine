@@ -39,6 +39,27 @@ that it would link against, like user32.lib, d3d9.lib, d3d11.lib, etc.
 These variables can be set by going into Settings->Search->Modify user environment variables
 in Windows.
 
+For building this without using explicit compiler commands,
+the engine allows you to use either a Shell script
+or a CMake script.
+
+The shell script is available as a UNIX-like .sh file,
+which is wrapped from a Batch script that gets executed by
+a Shell interpreter, more specifically, Git Bash.
+The reason why Git Bash is used is because it's what comes preinstalled
+with Git.
+You may have used Git clone to download this codebase.
+
+For CMake, the primary method for building a C++ project
+is by making a `build/` directory, and then
+putting all the bloat that CMake might generate there.
+
+```
+mkdir build
+cd build
+cmake .. && cmake --build .
+```
+
 ## The project's code
 ```cpp
 int main(void)

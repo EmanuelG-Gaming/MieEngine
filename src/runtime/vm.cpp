@@ -1,5 +1,5 @@
-#include "vm.h"
-#include "../base/base_log.h"
+#include "runtime/vm.h"
+#include "base/base_log.h"
 
 #include <string.h>
 

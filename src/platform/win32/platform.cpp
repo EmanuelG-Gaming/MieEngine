@@ -1,12 +1,24 @@
-#include "platform.h"
-#include "../platform.h"
+//#include "platform/win32/platform.h"
+#include "platform/platform.h"
 
-#include "../../base/base_log.h"
-#include "../../base/base_string.h"
+#include "base/base_log.h"
+#include "base/base_string.h"
 
 #include <stdio.h>
 
+// Doing these direct things.
+/*
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+#define _UNICODE
+#include <windows.h>
+#include <minwinbase.h>
 
+//#include <d3d11.h>
+//#include <d3dcompiler.h>
+#endif*/ /* _WIN32 */
 
 static HeapSystemInfo osInfo = { 0 };
 static int isCached = 0;

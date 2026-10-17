@@ -1,7 +1,10 @@
-#include "anm_vm.h"
-#include "../base/math/base_rng.h"
-#include "anm_vars.h"
-#include "anm_manager.h"
+#include "runtime/anm_vm.h"
+#include "base/math/base_rng.h"
+#include "runtime/anm_vars.h"
+#include "runtime/anm_manager.h"
+
+#include "core/interp.h"
+#include "core/timer.h"
 
 #include <string.h>
 #include <math.h>
@@ -346,7 +349,7 @@ void AnmVM::loadScript(AnmVM* self, AnmVM_rawInstr* instr)
 void AnmVM::update(AnmVM* self)
 {
     // UV scrolling?
-
+    /*
     float t = self->posInterp.timer.currentF / (float) self->posInterp.endTime;
 
     // Interpolating.
@@ -355,6 +358,7 @@ void AnmVM::update(AnmVM* self)
     //self->pos.z = (self->posInterp.goal.z - self->posInterp.initial.z) * t + self->posInterp.initial.z;
 
     self->posInterp.step(&self->posInterp);
+    */
 
     self->scale.x += self->scaleGrowth.x;
     self->scale.y += self->scaleGrowth.y;
@@ -369,7 +373,7 @@ void AnmVM::update(AnmVM* self)
     if (0)
     {
         fprintf(stderr, "INTEPOLATION DEBUG!\n");
-        fprintf(stderr, "t: %f\n", t);
+        //fprintf(stderr, "t: %f\n", t);
         fprintf(stderr, "posInterpGoal(%f, %f, %f)\n", self->posInterp.goal.x, self->posInterp.goal.y, self->posInterp.goal.z);
         fprintf(stderr, "posInterpInitial(%f, %f, %f)\n", self->posInterp.initial.x, self->posInterp.initial.y, self->posInterp.initial.z);
         fprintf(stderr, "pos(%f, %f, %f)\n", self->pos.x, self->pos.y, self->pos.z);
@@ -684,7 +688,7 @@ void AnmVM::run(AnmVM* self)
                 *a %= b;
             } break;
 
-            // Does a &= b.
+            // Does a %= b.
             case ANM_FMOD: // fmod(float& a, float b)
             {
                 float* a = self->getFloatArgPtr(0);

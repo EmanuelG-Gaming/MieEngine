@@ -1,5 +1,5 @@
-#include "camera.h"
-#include "../win/win.h"
+#include "graphics/camera.h"
+#include "win/win.h"
 
 
 #include <string.h>

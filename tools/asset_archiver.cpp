@@ -458,6 +458,10 @@ int main(int argc, const char* argv[])
         inPath = argv[1];
         outPath = argv[2];
     }
+    else if (argc == 2)
+    {
+        inPath = argv[1];
+    }
     else if (argc == 1)
     {
         fprintf(stderr, "Running with default settings.\n");

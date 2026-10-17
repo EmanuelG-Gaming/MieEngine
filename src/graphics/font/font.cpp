@@ -1,13 +1,13 @@
-#include "font.h"
-#include "../../base/base_log.h"
-#include "../../platform/platform.h"
+#include "graphics/font/font.h"
+#include "base/base_log.h"
+#include "platform/platform.h"
 
 #include <stdio.h>
 
 #include <string.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
+#include "graphics/font/stb_truetype.h"
 
 
 static const unsigned char bitmap_glyphs[95*13] = {
@@ -1155,136 +1155,6 @@ extern int DrawTextPro(GFX_font* font, const char* text, float ox, float oy,
 }
 */
 
-extern int DrawTextGlitch(GFX_font* font, const char* text, int indexStride,
-    int fontHeight, float spacingX, float spacingY, float scale,
-    int flags, const TextDrawStyle* options)
-{
-    if (options == NULL)
-    {
-        return DrawTextPro(font, text, fontHeight, spacingX, spacingY, scale,
-            flags, &defaultStyle);
-    }
-
-    int stringLen = strlen(text);
-    if (!stringLen)
-    {
-        return 0;
-    }
-
-    FontAtlasPage* page = &font->atlas.pages[FONT_PAGE_REGULAR];
-
-    FontGlyph* glyph;
-    float currentX, currentY;
-    float maxHeight;
-    int idx;
-
-    idx = *text - ' ';
-    glyph = &font->glyphs.glyphs[idx];
-
-    currentX = 0;
-    currentY = 0;
-
-    float lastValidHeight = 0;
-
-    int tx = drawState.tex[page->textureSlot].tex->w;
-    int ty = drawState.tex[page->textureSlot].tex->h;
-
-
-    float* col[4];
-    switch (drawState.colorMode)
-    {
-        default:
-        case COLOR1:
-            col[0] = drawState.col1;
-            col[1] = drawState.col1;
-            col[2] = drawState.col1;
-            col[3] = drawState.col1;
-            break;
-        case COLOR2:
-            col[0] = drawState.col2;
-            col[1] = drawState.col2;
-            col[2] = drawState.col2;
-            col[3] = drawState.col2;
-            break;
-        case COLOR_LR:
-            col[0] = drawState.col1;
-            col[1] = drawState.col2;
-            col[2] = drawState.col1;
-            col[3] = drawState.col2;
-            break;
-        case COLOR_UD:
-            col[0] = drawState.col1;
-            col[1] = drawState.col1;
-            col[2] = drawState.col2;
-            col[3] = drawState.col2;
-            break;
-    }
-
-
-    //ARENA_TEMP tmpArena = ArenaTempBegin(drawState.drawArena);
-    //uint32_t* indices = ArenaPushArrayZero(tmpArena.arena, uint32_t, stringLen*6);
-    uint32_t indices[256];
-
-    DrawPreFlush(stringLen*4,stringLen*6);
-
-    int nFaces = 0;
-    const char* ptr = text;
-    for (; *ptr; )
-    {
-        if (*ptr == '\n')
-        {
-            float h = (maxHeight > 0) ? maxHeight : lastValidHeight;
-            currentY -= (h + spacingY) * scale;
-            currentX = 0;
-
-            maxHeight = 0;
-            ptr++;
-
-            continue;
-        }
-
-        idx = *ptr - ' ';
-        glyph = &font->glyphs.glyphs[idx];
-
-        float width = glyph->width;
-        float height = glyph->height;
-        float dwidth = (glyph->maxX - glyph->minX);
-        float dheight = (glyph->maxY - glyph->minY);
-        float bearingY = glyph->bearY;
-
-        float srcX = glyph->x / (float) tx;
-        float srcY = (glyph->y / (float) ty);
-        float srcW = width / (float) tx;
-        float srcH = (height / (float) ty);
-
-        DrawVertex(currentX,                currentY, 0, srcX, srcY, col[0][0], col[0][1], col[0][2], col[0][3]);
-        DrawVertex(currentX + width*scale,  currentY, 0, srcX + srcW, srcY, col[1][0], col[1][1], col[1][2], col[1][3]);
-        DrawVertex(currentX, currentY - height*scale, 0, srcX, srcY + srcH, col[2][0], col[2][1], col[2][2], col[2][3]);
-        DrawVertex(currentX + width*scale, currentY - height*scale, 0, srcX + srcH, srcY + srcH, col[3][0], col[3][1], col[3][2], col[3][3]);
-
-        indices[nFaces*6+0] = nFaces*indexStride+1;
-        indices[nFaces*6+1] = nFaces*indexStride+0;
-        indices[nFaces*6+2] = nFaces*indexStride+2;
-
-        indices[nFaces*6+3] = nFaces*indexStride+3;
-        indices[nFaces*6+4] = nFaces*indexStride+1;
-        indices[nFaces*6+5] = nFaces*indexStride+2;
-        nFaces++;
-
-        currentX += (glyph->advanceX + spacingX) * scale;
-        maxHeight = MAX(maxHeight, height);
-        lastValidHeight = maxHeight;
-
-        ptr++;
-    }
-    DrawIndices(nFaces*4, nFaces*6, indices);
-
-    DrawSrcRect(0, 0, tx, ty);
-
-    //ArenaTempEnd(tmpArena);
-
-    return 0;
-}
 
 extern int DrawTextPro(GFX_font* font, const char* text,
     int fontHeight, float spacingX, float spacingY, float scale,
@@ -1314,6 +1184,7 @@ extern int DrawTextPro(GFX_font* font, const char* text,
 
     currentX = 0;
     currentY = 0;
+    maxHeight = 0;
 
     float lastValidHeight = 0;
 
@@ -1356,9 +1227,8 @@ extern int DrawTextPro(GFX_font* font, const char* text,
     }
 
 
-    //ARENA_TEMP tmpArena = ArenaTempBegin(drawState.drawArena);
-    //uint32_t* indices = ArenaPushArrayZero(tmpArena.arena, uint32_t, stringLen*6);
-    uint32_t indices[256];
+    ARENA_TEMP tmpArena = ArenaTempBegin(drawState.drawArena);
+    uint32_t* indices = ArenaPushArrayZero(tmpArena.arena, uint32_t, stringLen*6);
 
     DrawPreFlush(stringLen*4,stringLen*6);
 
@@ -1387,23 +1257,27 @@ extern int DrawTextPro(GFX_font* font, const char* text,
         float dheight = (glyph->maxY - glyph->minY);
         float bearingY = glyph->bearY;
 
-        float srcX = glyph->x / (float) tx;
-        float srcY = (glyph->y / (float) ty);
-        float srcW = width / (float) tx;
-        float srcH = (height / (float) ty);
+        //float srcX = glyph->x / (float) tx;
+        //float srcY = (glyph->y / (float) ty);
+        //float srcW = width / (float) tx;
+        //float srcH = (height / (float) ty);
+        float by = bearingY;
 
-        DrawVertex(currentX,                currentY, 0, srcX, srcY, col[0][0], col[0][1], col[0][2], col[0][3]);
-        DrawVertex(currentX + width*scale,  currentY, 0, srcX + srcW, srcY, col[1][0], col[1][1], col[1][2], col[1][3]);
-        DrawVertex(currentX, currentY - height*scale, 0, srcX, srcY + srcH, col[2][0], col[2][1], col[2][2], col[2][3]);
-        DrawVertex(currentX + width*scale, currentY - height*scale, 0, srcX + srcH, srcY + srcH, col[3][0], col[3][1], col[3][2], col[3][3]);
 
-        indices[nFaces*6+0] = nFaces*4+1;
-        indices[nFaces*6+1] = nFaces*4+0;
-        indices[nFaces*6+2] = nFaces*4+2;
+        DrawSrcRect(glyph->x, glyph->y, width, height);
+
+        DrawVertex(currentX,                currentY-scale*by, 0, drawState.srcX, drawState.srcY, col[0][0], col[0][1], col[0][2], col[0][3]);
+        DrawVertex(currentX + width*scale,  currentY-scale*by, 0, drawState.srcX + drawState.srcW, drawState.srcY, col[1][0], col[1][1], col[1][2], col[1][3]);
+        DrawVertex(currentX, currentY - (height+by)*scale, 0, drawState.srcX, drawState.srcY + drawState.srcH, col[2][0], col[2][1], col[2][2], col[2][3]);
+        DrawVertex(currentX + width*scale, currentY - (height+by)*scale, 0, drawState.srcX + drawState.srcW, drawState.srcY + drawState.srcH, col[3][0], col[3][1], col[3][2], col[3][3]);
+
+        indices[nFaces*6+0] = nFaces*4+2;
+        indices[nFaces*6+1] = nFaces*4+3;
+        indices[nFaces*6+2] = nFaces*4+0;
 
         indices[nFaces*6+3] = nFaces*4+3;
         indices[nFaces*6+4] = nFaces*4+1;
-        indices[nFaces*6+5] = nFaces*4+2;
+        indices[nFaces*6+5] = nFaces*4+0;
         nFaces++;
 
         currentX += (glyph->advanceX + spacingX) * scale;
@@ -1416,21 +1290,7 @@ extern int DrawTextPro(GFX_font* font, const char* text,
 
     DrawSrcRect(0, 0, tx, ty);
 
-    //ArenaTempEnd(tmpArena);
+    ArenaTempEnd(tmpArena);
 
     return 0;
 }
-
-
-/*
-   Example API:
-   GFX_font* font = FontInit(initArena);
-   FontAtlasPage* page = FontPageInit(font, 0);
-   FontLoadBitmapDefault(font, 0);
-
-   // Add ASCII loading.
-   FontBlit_ascii();
-
-   GFX_texture* tex = FontUploadTexture(font, 0);
-*/
-

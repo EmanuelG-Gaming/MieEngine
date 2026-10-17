@@ -1,5 +1,5 @@
-#include "base_string.h"
-#include "../mem/arena.h"
+#include "base/base_string.h"
+#include "mem/arena.h"
 
 #include <string.h>
 #include <stdarg.h>

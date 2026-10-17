@@ -2,8 +2,9 @@
 #define WIN32_PLATFORM_H_ 1
 
 
-/*
+
 // Doing these direct things.
+/*
 #ifdef _WIN32
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -15,6 +16,7 @@
 //#include <d3d11.h>
 //#include <d3dcompiler.h>
 #endif*/ /* _WIN32 */
+
 
 /*
 #if _MSC_VER
