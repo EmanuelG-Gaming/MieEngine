@@ -154,7 +154,8 @@ typedef struct FontAtlas {
 
 
 typedef struct GlyphList {
-    ARENA* glyphArena;
+    //ARENA* glyphArena;
+    void* glyphAlloc;
     FontGlyph* glyphs;
     int count;
     int capacity;
@@ -162,8 +163,10 @@ typedef struct GlyphList {
 
 
 typedef struct GFX_font {
-    ARENA* mainArena;
-    ARENA* imageArena;
+    //ARENA* mainArena;
+    //ARENA* imageArena;
+    void* mainAlloc;
+    void* imageAlloc;
     GlyphList glyphs;
 
     FontAtlas atlas;
@@ -202,7 +205,7 @@ extern int GlyphInit(FontGlyph* glyph, FontAtlasPage* page,
    Font.
 */
 
-extern GFX_font* FontInit(ARENA* arena);
+extern GFX_font* FontInit(void* alloc);
 extern void FontTerminate(GFX_font* font);
 
 extern FontAtlasPage* FontPageInit(GFX_font* font, int pageIndex);
@@ -213,7 +216,7 @@ extern FontAtlasPage* FontLoadTTF(GFX_font* font, int pageIndex, const char* fil
 
 extern FontAtlasPage* FontPageAdd_ascii(GFX_font* font, int pageIndex);
 
-extern GFX_texture* FontUploadTexture(GFX_font* font, int pageIndex);
+extern GFX_texture* FontUploadTexture(GFX_font* font, int pageIndex, int flags);
 
 /*
    Text renderer.

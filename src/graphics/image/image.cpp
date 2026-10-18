@@ -2,6 +2,8 @@
 #include "base/base_defs.h"
 #include "base/math/base_rng.h"
 
+#include "mem/arena.h"
+
 #include <string.h>
 #include <stdio.h>
 
@@ -157,18 +159,38 @@ ALIGN_DECL(64) static const BlendFunc blend_functions[IMAGE_BLEND_COUNT] = {
 
 
 extern SoftImage* SoftImageInitEx(
-    ARENA* arena,
+    void* alloc,
     int clipX, int clipY,
     int clipW, int clipH,
     int capW, int capH, int nChannels)
 {
-    SoftImage* image = ArenaPushStruct(arena, SoftImage);
+    SoftImage* image;
+    if (alloc == NULL)
+    {
+        image = (SoftImage *) _MALLOC(sizeof(SoftImage));
+        _MEMSET(image, 0, sizeof(SoftImage));
+    }
+    else
+    {
+        ARENA* arena = static_cast <ARENA *> (alloc);
+        image = ArenaPushStruct(arena, SoftImage);
+    }
+
     image->width = capW;
     image->height = capH;
     image->nChannels = nChannels;
 
     size_t bytecount = image->width * image->height * nChannels;
-    image->data = ArenaPushArrayZero(arena, unsigned char, bytecount);
+    if (alloc == NULL)
+    {
+        image->data = (unsigned char *) _MALLOC(bytecount);
+        _MEMSET(image->data, 0, bytecount);
+    }
+    else
+    {
+        ARENA* arena = static_cast <ARENA *> (alloc);
+        image->data = ArenaPushArrayZero(arena, unsigned char, bytecount);
+    }
 
     SoftImageSetClip(image, clipX, clipY, clipW, clipH);
     SoftImageSetBlend(image, IMAGE_BLEND_ALPHA);
@@ -178,15 +200,15 @@ extern SoftImage* SoftImageInitEx(
 
 
 extern SoftImage* SoftImageInitClip(
-    ARENA* arena,
+    void* alloc,
     int clipW, int clipH,
     int capW, int capH, int nChannels)
 {
-    return SoftImageInitEx(arena, 0, 0, clipW, clipH, capW, capH, nChannels);
+    return SoftImageInitEx(alloc, 0, 0, clipW, clipH, capW, capH, nChannels);
 }
-extern SoftImage* SoftImageInitOrigin(ARENA* arena, int capW, int capH, int nChannels)
+extern SoftImage* SoftImageInitOrigin(void* alloc, int capW, int capH, int nChannels)
 {
-    return SoftImageInitEx(arena, 0, 0, capW, capH, capW, capH, nChannels);
+    return SoftImageInitEx(alloc, 0, 0, capW, capH, capW, capH, nChannels);
 }
 
 

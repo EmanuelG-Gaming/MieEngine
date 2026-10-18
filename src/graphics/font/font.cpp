@@ -682,7 +682,7 @@ static void AddBitmapGlyphToImage(GFX_font* font, FontAtlasPage* page, FontGlyph
 
     // We create 3 temporary images.
     //ARENA_TEMP maybeTemp = ArenaTempBegin(font->imageArena);
-    SoftImage* tmp1 = SoftImageInitClip(font->imageArena, clipW, clipH, capW, capH, 4);
+    SoftImage* tmp1 = SoftImageInitClip(font->imageAlloc, clipW, clipH, capW, capH, 4);
 
     if (page->fontType == FONT_KIND_BITMAP)
     {
@@ -728,7 +728,7 @@ extern FontAtlasPage* FontPageInit(GFX_font* font, int pageIndex)
     //size_t bytecount = page->image.
     //page->image = ArenaPushArrayZero(font->arena, u8, bytecount);
 
-    page->image = SoftImageInitOrigin(font->imageArena, page->width, page->height, 4);
+    page->image = SoftImageInitOrigin(font->imageAlloc, page->width, page->height, 4);
 
     if (pageIndex >= font->atlas.nPages)
     {
@@ -782,11 +782,24 @@ extern FontAtlasPage* FontLoadTTF(GFX_font* font, int pageIndex, const char* fil
     u8* ffbData;
     u32 ffbLength;
 
-    Platform_fileRead(font->mainArena, STR8_LIT(filePath), &ffbData, &ffbLength);
+    Platform_fileRead(font->mainAlloc, STR8_LIT(filePath), &ffbData, &ffbLength);
 
     fprintf(stderr, "%s: Font file buffer: %p %u\n", __func__, ffbData, ffbLength);
 
-    stbtt_bakedchar* cdata = ArenaPushArrayZero(font->mainArena, stbtt_bakedchar, 128);
+    stbtt_bakedchar* cdata;
+    if (font->mainAlloc == NULL)
+    {
+        // Sizeof the chars.
+        size_t bytecount = sizeof(stbtt_bakedchar) * 128;
+
+        cdata = (stbtt_bakedchar *) _MALLOC(bytecount);
+        _MEMSET(cdata, 0, bytecount);
+    }
+    else
+    {
+        ARENA* mainArena = static_cast <ARENA *> (font->mainAlloc);
+        cdata = ArenaPushArrayZero(mainArena, stbtt_bakedchar, 128);
+    }
 
 
     FontAtlasPage* page = FontPageInit(font, pageIndex);
@@ -800,8 +813,20 @@ extern FontAtlasPage* FontLoadTTF(GFX_font* font, int pageIndex, const char* fil
     page->scale = 1.0f;
 
     // Copy some data.
-    unsigned char* redData = ArenaPushArrayZero(font->mainArena, unsigned char, page->width * page->height);
+    unsigned char* redData;
+    if (font->mainAlloc == NULL)
+    {
+        size_t bytecount = sizeof(unsigned char) * page->width * page->height;
+        redData = (unsigned char *) _MALLOC(bytecount);
+        _MEMSET(redData, 0, bytecount);
+    }
+    else
+    {
+        ARENA* mainArena = static_cast <ARENA *> (font->mainAlloc);
+        redData = ArenaPushArrayZero(mainArena, unsigned char, page->width * page->height);
+    }
     stbtt_BakeFontBitmap(ffbData, 0, 32.0f, redData, page->width, page->height, 32, 95, cdata);
+
 
     // And then fill it up.
     for (int i = 0; i < page->width * page->height; ++i)
@@ -910,25 +935,40 @@ extern FontAtlasPage* FontPageAdd_ascii(GFX_font* font, int pageIndex)
 //page->rom.bitmapData.format = IMAGE_FORMAT_R;
 
 
-extern GFX_texture* FontUploadTexture(GFX_font* font, int pageIndex)
+extern GFX_texture* FontUploadTexture(GFX_font* font, int pageIndex, int flags)
 {
     FontAtlasPage* page = &font->atlas.pages[pageIndex];
-    unsigned int flags = TEXTURE_ALPHA;
-    //flags ^= flags;
-    page->texture = LoadImmutableTextureFromPixels(font->mainArena, page->width, page->height, page->image->data, flags);
+    page->texture = LoadImmutableTextureFromPixels(font->mainAlloc, page->width, page->height, page->image->data, flags);
 
     // We remove the texture from the image.
-    ArenaClear(font->imageArena);
+    if (font->imageAlloc == NULL)
+    {
+        _FREE(page->image->data);
+    }
+    else
+    {
+        ARENA* imageArena = static_cast <ARENA *> (font->imageAlloc);
+        ArenaClear(imageArena);
+    }
 
     return page->texture;
 }
 
-extern GFX_font* FontInit(ARENA* arena)
+extern GFX_font* FontInit(void* alloc)
 {
-    GFX_font* font = ArenaPushStruct(arena, GFX_font);
-    font->mainArena = arena;
-    font->imageArena = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
-
+    GFX_font* font;
+    if (alloc == NULL)
+    {
+        font = (GFX_font *) _MALLOC(sizeof(GFX_font));
+        _MEMSET(font, 0, sizeof(GFX_font));
+    }
+    else
+    {
+        ARENA* arena = static_cast<ARENA *> (alloc);
+        font = ArenaPushStruct(arena, GFX_font);
+        font->mainAlloc = arena;
+        font->imageAlloc = ArenaInit(MB(8), KB(8), ARENA_FLAG_GROWABLE);
+    }
 
     //LogErrorEmitF("%s: Arena current: %p\n", __func__, arena->current);
 
@@ -936,10 +976,23 @@ extern GFX_font* FontInit(ARENA* arena)
     font->atlas.nPages = 0;
 
     // Init the glyph list.
-    font->glyphs.glyphArena = ArenaInit(MB(8), KB(64), ARENA_FLAG_GROWABLE);
-    font->glyphs.capacity = FONT_GLYPH_COUNT;
-    font->glyphs.count = 0;
-    font->glyphs.glyphs = ArenaPushArrayZero(font->glyphs.glyphArena, FontGlyph, font->glyphs.capacity);
+    if (alloc == NULL)
+    {
+        font->glyphs.count = 0;
+        font->glyphs.capacity = FONT_GLYPH_COUNT;
+        font->glyphs.glyphs = (FontGlyph *) _MALLOC(sizeof(FontGlyph) * font->glyphs.capacity);
+    }
+    else
+    {
+        font->glyphs.glyphAlloc = ArenaInit(MB(8), KB(64), ARENA_FLAG_GROWABLE);
+        font->glyphs.capacity = FONT_GLYPH_COUNT;
+        font->glyphs.count = 0;
+
+        font->glyphs.glyphs = ArenaPushArrayZero(
+            static_cast <ARENA *> (font->glyphs.glyphAlloc), FontGlyph,
+            font->glyphs.capacity
+        );
+    }
 
     //LogErrorEmitF("%s: Glyph array: %p\n", __func__,font->glyphs.glyphs);
 
@@ -954,8 +1007,16 @@ extern void FontTerminate(GFX_font* font)
     // Terminate the pages.
 
     //font->arena = NULL;
-    ArenaTerminate(font->glyphs.glyphArena);
-    ArenaTerminate(font->imageArena);
+    if (font->glyphs.glyphAlloc)
+    {
+        ARENA* glyphArena = static_cast <ARENA *> (font->glyphs.glyphAlloc);
+        ArenaTerminate(glyphArena);
+    }
+    if (font->imageAlloc)
+    {
+        ARENA* imageArena = static_cast <ARENA *> (font->imageAlloc);
+        ArenaTerminate(imageArena);
+    }
 }
 
 

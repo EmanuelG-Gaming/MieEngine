@@ -1,7 +1,7 @@
 #ifndef IMAGE_H_
 #define IMAGE_H_ 1
 
-#include "../../mem/arena.h"
+//#include "../../mem/arena.h"
 
 typedef enum ImageBlendMode {
     IMAGE_BLEND_NONE = 0,
@@ -39,22 +39,22 @@ typedef struct SoftImage {
 } SoftImage;
 
 extern SoftImage* SoftImageInitEx(
-    ARENA* arena,
+    void* alloc,
     int clipX, int clipY,
     int clipW, int clipH,
     int capW, int capH, int nChannels);
 
 extern SoftImage* SoftImageInitClip(
-    ARENA* arena,
+    void* alloc,
     int clipW, int clipH,
     int capW, int capH, int nChannels);
 
-extern SoftImage* SoftImageInitOrigin(ARENA* arena, int capW, int capH, int nChannels);
+extern SoftImage* SoftImageInitOrigin(void* alloc, int capW, int capH, int nChannels);
 
 extern void SoftImageTerminate(SoftImage* image);
 
 // Resize an image to a larger size.
-extern SoftImage* SoftImageResizeUpper(ARENA* arena, SoftImage* image, int capW, int capH);
+extern SoftImage* SoftImageResizeUpper(void* alloc, SoftImage* image, int capW, int capH);
 
 extern void SoftImageSetClip(SoftImage* image, int x, int y, int w, int h);
 extern void SoftImageSetBlend(SoftImage* image, ImageBlendMode mode);
