@@ -1,5 +1,6 @@
 #include "graphics/font/font.h"
 #include "base/base_log.h"
+#include "io/asset.h"
 #include "platform/platform.h"
 
 #include <stdio.h>
@@ -765,26 +766,12 @@ extern FontAtlasPage* FontLoadBitmapDefault(GFX_font* font, int pageIndex)
 
 extern FontAtlasPage* FontLoadTTF(GFX_font* font, int pageIndex, const char* filePath)
 {
-    // TTF data.
-    /*
-    stbtt_fontinfo* fontinfo = ArenaPushStruct(font->mainArena, stbtt_fontinfo);
-    String8 fontFileBuffer = Platform_fileRead(font->mainArena, STR8_LIT(filePath));
-    if (!stbtt_InitFont(fontinfo, fontFileBuffer.data, 0))
-    {
-        LogInfoEmitF("%s: Failed to init TTF font at path: %s", __func__, filePath);
-        return NULL;
-    }
-    */
-
-    // TODO: This is probably gonna leak some memory.
-
-    //stbtt_fontinfo* fontinfo = ArenaPushStruct(font->mainArena, stbtt_fontinfo);
     u8* ffbData;
     u32 ffbLength;
 
-    Platform_fileRead(font->mainAlloc, STR8_LIT(filePath), &ffbData, &ffbLength);
-
-    fprintf(stderr, "%s: Font file buffer: %p %u\n", __func__, ffbData, ffbLength);
+    Asset* asset = AssetLoad(filePath);
+    ffbData = static_cast <u8 *> (asset->data);
+    ffbLength = asset->size;
 
     stbtt_bakedchar* cdata;
     if (font->mainAlloc == NULL)
@@ -803,10 +790,6 @@ extern FontAtlasPage* FontLoadTTF(GFX_font* font, int pageIndex, const char* fil
 
 
     FontAtlasPage* page = FontPageInit(font, pageIndex);
-    /*
-    page->ttf.user = fontinfo;
-    page->ttf.fontFileBuffer = fontFileBuffer;
-    */
 
     page->flags |= 0;
     page->fontType = FONT_KIND_TTF;
@@ -825,7 +808,7 @@ extern FontAtlasPage* FontLoadTTF(GFX_font* font, int pageIndex, const char* fil
         ARENA* mainArena = static_cast <ARENA *> (font->mainAlloc);
         redData = ArenaPushArrayZero(mainArena, unsigned char, page->width * page->height);
     }
-    stbtt_BakeFontBitmap(ffbData, 0, 32.0f, redData, page->width, page->height, 32, 95, cdata);
+    stbtt_BakeFontBitmap(ffbData, 0, 48.0f, redData, page->width, page->height, 32, 95, cdata);
 
 
     // And then fill it up.
@@ -862,6 +845,9 @@ extern FontAtlasPage* FontLoadTTF(GFX_font* font, int pageIndex, const char* fil
 
         font->glyphs.glyphs[font->glyphs.count++] = glyph;
     }
+
+    AssetClose(asset);
+
 
     return page;
 }
