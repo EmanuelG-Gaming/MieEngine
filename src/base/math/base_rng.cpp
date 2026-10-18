@@ -104,29 +104,30 @@ extern f32 RNG_randf32(void)
 
 
 
-extern inline f32 RNG_randf32_rangeR(RNG_state* rng, float mn, float mx)
+extern f32 RNG_randf32_rangeR(RNG_state* rng, float mn, float mx)
 {
     // Uses linear interpolation to scale the weight to [mn, mx].
     return mn + (RNG_randf32R(rng)) * (mx - mn);
 }
-extern inline f32 RNG_randf32_range(float mn, float mx)
+extern f32 RNG_randf32_range(float mn, float mx)
 {
     return RNG_randf32_rangeR(&default_rng, mn, mx);
 }
 
 
+// TODO: No inline?
 
-extern inline int RNG_rand_rangeNUR(RNG_state* rng, int mn, int mx)
+extern int RNG_rand_rangeNUR(RNG_state* rng, int mn, int mx)
 {
     return mn + (RNG_randR(rng) % (mx - mn));
 }
-extern inline int RNG_rand_rangeNU(int mn, int mx)
+extern int RNG_rand_rangeNU(int mn, int mx)
 {
     return RNG_rand_rangeNUR(&default_rng, mn, mx);
 }
 
 // Uniform sampling.
-extern inline int RNG_rand_rangeUniformR(RNG_state* rng, int mn, int mx)
+extern int RNG_rand_rangeUniformR(RNG_state* rng, int mn, int mx)
 {
     // Daniel Lemire's method.
     u64 res = (u64) RNG_randR(rng) * (u64) (mx - mn);
@@ -134,7 +135,7 @@ extern inline int RNG_rand_rangeUniformR(RNG_state* rng, int mn, int mx)
 }
 
 
-extern inline int RNG_rand_rangeUniform(int mn, int mx)
+extern int RNG_rand_rangeUniform(int mn, int mx)
 {
     return RNG_rand_rangeUniformR(&default_rng, mn, mx);
 }
@@ -146,22 +147,22 @@ extern inline int RNG_rand_rangeUniform(int mn, int mx)
 // if upper is a power of 2.
 // But Lemire's method is more predictable.
 
-extern inline u32 RNG_rand_rangeIndexNUR(RNG_state* rng, u32 upper)
+extern u32 RNG_rand_rangeIndexNUR(RNG_state* rng, u32 upper)
 {
     return RNG_randR(rng) % upper;
 }
-extern inline u32 RNG_rand_rangeIndexNU(u32 upper)
+extern u32 RNG_rand_rangeIndexNU(u32 upper)
 {
     return RNG_rand_rangeIndexNUR(&default_rng, upper);
 }
 
-extern inline u32 RNG_rand_rangeIndexUniformR(RNG_state* rng, u32 upper)
+extern u32 RNG_rand_rangeIndexUniformR(RNG_state* rng, u32 upper)
 {
     // Daniel Lemire's method of 64-bit scaling.
     u64 res = (u64) RNG_randR(rng) * (u64) upper;
     return (u32) (res >> 32);
 }
-extern inline u32 RNG_rand_rangeIndexUniform(u32 upper)
+extern u32 RNG_rand_rangeIndexUniform(u32 upper)
 {
     return RNG_rand_rangeIndexUniformR(&default_rng, upper);
 }

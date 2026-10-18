@@ -12,7 +12,11 @@
 // Quake III arena Q_rsqrt()-like optimizations.
 //#define MATHF_USE_FAST 1
 
-#define MATHF_FORCE_INLINE 1
+// TODO: Fix
+
+//#define MATHF_FORCE_INLINE 1
+
+
 // Should C++ wrapper structs use
 // left-handed coordinate space (like DirectX)?
 #define MATHF_USE_LH 1
@@ -33,7 +37,7 @@
 
 
 #ifdef MATHF_FORCE_INLINE
-#define MATHF_IMPL _inline
+#define MATHF_IMPL inline
 #else
 #define MATHF_IMPL
 #endif

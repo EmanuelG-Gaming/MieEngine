@@ -31,11 +31,21 @@
 # This is arguably one of the slowest build processes on Windows,
 # mostly because it uses Clang/GCC and separate translation units per source file,
 # but it's also the one that gets you the compile commands.
+#
+# A faster alternative to Makefiles is to use "Ninja".
+#
+
+
+
+
+
+
 
 cmake_minimum_required(VERSION 3.0.0...3.13)
 project(MieEngine VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_BUILD_TYPE "Debug")
 
 
 # For Windows building.
@@ -50,6 +60,8 @@ add_library(MieEngine STATIC)
 target_include_directories(MieEngine PUBLIC "include")
 target_link_libraries(MieEngine "${D3D11_LIBRARY}" "${DXGI_LIBRARY}")
 
+target_link_libraries(${OUTPUT_NAME} MieEngine)
+
 
 add_subdirectory("ext")
 
@@ -57,8 +69,10 @@ add_subdirectory("ext")
 # Link libraries.
 add_subdirectory("src")
 
-# add tools.
-add_subdirectory("tools")
+# Add tools.
+add_executable(archiver "tools/asset_archiver.cpp")
+
+
 
 # Testing.
 #add_executable(main "src/main.cpp")
@@ -73,6 +87,7 @@ add_subdirectory("tools")
 #if(NOT FXC)
 #    message("Couldn't find fxc")
 #endif(NOT FXC)
+
 
 add_custom_target(Tools ALL)
 add_custom_target(fx ALL)
@@ -116,39 +131,14 @@ add_dependencies(Tools fx)
 
 
 
-# Error: Access denied error (0xC0000005) in MSbuild
 
-
-# And then we archive the assets.
-#add_custom_target(ArchiveAssets ALL)
-
-
-
-set(OUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/assets.bin")
-add_custom_command(
-    OUTPUT "${OUT_FILE}"
-    COMMAND "${CMAKE_CURRENT_BINARY_DIR}/archiver" "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-    COMMENT "Archive assets"
-    VERBATIM
-)
-
-add_custom_target(ArchiveAssets ALL DEPENDS "${OUT_FILE}")
-
-
-
-#target_sources(ArchiveAssets ALL DEPENDS "\${OUT_FILE}")
-#add_dependencies(Tools ArchiveAssets)
-
-
-
-
-# Copy the archive, not the individual assets.
-#file(COPY assets.bin DESTINATION ${CMAKE_BINARY_DIR})
-
-#add_custom_target(copy_assets
-#    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
+#set(OUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/assets.bin")
+#add_custom_command(
+#    OUTPUT "${OUT_FILE}"
+#    COMMAND "${CMAKE_CURRENT_BINARY_DIR}/archiver" "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+#    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+#    COMMENT "Archive assets"
+#    VERBATIM
 #)
 
-# Do this automatically.
-#add_dependencies(main copy_assets)
+#add_custom_target(ArchiveAssets ALL DEPENDS "${OUT_FILE}")

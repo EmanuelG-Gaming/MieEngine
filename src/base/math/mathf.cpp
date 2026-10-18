@@ -270,57 +270,57 @@ extern vec2* Vec2Lerp(vec2* out, const vec2* a, const vec2* b, float t)
 */
 
 
-MATHF_IMPL void Vec3Zero(vec3* out)
+extern MATHF_IMPL void Vec3Zero(vec3* out)
 {
     _mm_store_ps(&out->x, _mm_set_ps1(0));
 }
-MATHF_IMPL void Vec3Copy(vec3* out, const vec3* v)
+extern MATHF_IMPL void Vec3Copy(vec3* out, const vec3* v)
 {
     _mm_store_ps(&out->x, _mm_load_ps(&v->x));
 }
-MATHF_IMPL vec3* Vec3Add(vec3* out, const vec3* a, const vec3* b)
+extern MATHF_IMPL vec3* Vec3Add(vec3* out, const vec3* a, const vec3* b)
 {
     __m128 v = _mm_add_ps(_mm_load_ps(&a->x), _mm_load_ps(&b->x));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec3* Vec3Sub(vec3* out, const vec3* a, const vec3* b)
+extern MATHF_IMPL vec3* Vec3Sub(vec3* out, const vec3* a, const vec3* b)
 {
     __m128 v = _mm_sub_ps(_mm_load_ps(&a->x), _mm_load_ps(&b->x));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec3* Vec3Mul(vec3* out, const vec3* a, const vec3* b)
+extern MATHF_IMPL vec3* Vec3Mul(vec3* out, const vec3* a, const vec3* b)
 {
     __m128 v = _mm_mul_ps(_mm_load_ps(&a->x), _mm_load_ps(&b->x));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec3* Vec3Div(vec3* out, const vec3* a, const vec3* b)
+extern MATHF_IMPL vec3* Vec3Div(vec3* out, const vec3* a, const vec3* b)
 {
     __m128 v = _mm_div_ps(_mm_load_ps(&a->x), _mm_load_ps(&b->x));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec3* Vec3AddScalar(vec3* out, const vec3* a, float s)
+extern MATHF_IMPL vec3* Vec3AddScalar(vec3* out, const vec3* a, float s)
 {
     __m128 v = _mm_add_ps(_mm_load_ps(&a->x), _mm_set_ps1(s));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec3* Vec3SubScalar(vec3* out, const vec3* a, float s)
+extern MATHF_IMPL vec3* Vec3SubScalar(vec3* out, const vec3* a, float s)
 {
     __m128 v = _mm_sub_ps(_mm_load_ps(&a->x), _mm_set_ps1(s));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec3* Vec3MulScalar(vec3* out, const vec3* a, float s)
+extern MATHF_IMPL vec3* Vec3MulScalar(vec3* out, const vec3* a, float s)
 {
     __m128 v = _mm_mul_ps(_mm_load_ps(&a->x), _mm_set_ps1(s));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec3* Vec3DivScalar(vec3* out, const vec3* a, float s)
+extern MATHF_IMPL vec3* Vec3DivScalar(vec3* out, const vec3* a, float s)
 {
     __m128 v = _mm_div_ps(_mm_load_ps(&a->x), _mm_set_ps1(s));
     _mm_store_ps(&out->x, v);
@@ -328,7 +328,7 @@ MATHF_IMPL vec3* Vec3DivScalar(vec3* out, const vec3* a, float s)
 }
 
 /* a * (1-t) + b*t. */
-MATHF_IMPL vec3* Vec3Lerp(vec3* out, const vec3* a, const vec3* b, float t)
+extern MATHF_IMPL vec3* Vec3Lerp(vec3* out, const vec3* a, const vec3* b, float t)
 {
     __m128 t2 = splat_x(_mm_set_ss(t));
     __m128 t3 = _mm_sub_ps(_mm_set_ps1(1.0f), t2);
@@ -343,58 +343,58 @@ MATHF_IMPL vec3* Vec3Lerp(vec3* out, const vec3* a, const vec3* b, float t)
    4-dimensional vectors.
 */
 
-MATHF_IMPL void Vec4Zero(vec4* out)
+extern MATHF_IMPL void Vec4Zero(vec4* out)
 {
     _mm_store_ps(&out->x, _mm_set_ps1(0));
 }
-MATHF_IMPL void Vec4Copy(vec4* out, const vec4* v)
+extern MATHF_IMPL void Vec4Copy(vec4* out, const vec4* v)
 {
     _mm_store_ps(&out->x, _mm_load_ps(&v->x));
 }
-MATHF_IMPL vec4* Vec4Add(vec4* out, const vec4* a, const vec4* b)
+extern MATHF_IMPL vec4* Vec4Add(vec4* out, const vec4* a, const vec4* b)
 {
     __m128 v = _mm_add_ps(_mm_load_ps(&a->x), _mm_load_ps(&b->x));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec4* Vec4Sub(vec4* out, const vec4* a, const vec4* b)
+extern MATHF_IMPL vec4* Vec4Sub(vec4* out, const vec4* a, const vec4* b)
 {
     __m128 v = _mm_sub_ps(_mm_load_ps(&a->x), _mm_load_ps(&b->x));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec4* Vec4Mul(vec4* out, const vec4* a, const vec4* b)
+extern MATHF_IMPL vec4* Vec4Mul(vec4* out, const vec4* a, const vec4* b)
 {
     __m128 v = _mm_mul_ps(_mm_load_ps(&a->x), _mm_load_ps(&b->x));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec4* Vec4Div(vec4* out, const vec4* a, const vec4* b)
+extern MATHF_IMPL vec4* Vec4Div(vec4* out, const vec4* a, const vec4* b)
 {
     __m128 v = _mm_div_ps(_mm_load_ps(&a->x), _mm_load_ps(&b->x));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec4* Vec4AddScalar(vec4* out, const vec4* a, float s)
+extern MATHF_IMPL vec4* Vec4AddScalar(vec4* out, const vec4* a, float s)
 {
     __m128 v = _mm_add_ps(_mm_load_ps(&a->x), _mm_set_ps1(s));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec4* Vec4SubScalar(vec4* out, const vec4* a, float s)
+extern MATHF_IMPL vec4* Vec4SubScalar(vec4* out, const vec4* a, float s)
 {
     __m128 v = _mm_sub_ps(_mm_load_ps(&a->x), _mm_set_ps1(s));
     _mm_store_ps(&out->x, v);
     return out;
 }
-MATHF_IMPL vec4* Vec4MulScalar(vec4* out, const vec4* a, float s)
+extern MATHF_IMPL vec4* Vec4MulScalar(vec4* out, const vec4* a, float s)
 {
     __m128 v = _mm_mul_ps(_mm_load_ps(&a->x), _mm_set_ps1(s));
     _mm_store_ps(&out->x, v);
     return out;
 }
 
-MATHF_IMPL vec4* Vec4DivScalar(vec4* out, const vec4* a, float s)
+extern MATHF_IMPL vec4* Vec4DivScalar(vec4* out, const vec4* a, float s)
 {
     __m128 v = _mm_div_ps(_mm_load_ps(&a->x), _mm_set_ps1(s));
     _mm_store_ps(&out->x, v);
@@ -402,7 +402,7 @@ MATHF_IMPL vec4* Vec4DivScalar(vec4* out, const vec4* a, float s)
 }
 
 /* a * (1-t) + b*t. */
-MATHF_IMPL vec4* Vec4Lerp(vec4* out, const vec4* a, const vec4*b, float t)
+extern MATHF_IMPL vec4* Vec4Lerp(vec4* out, const vec4* a, const vec4*b, float t)
 {
     __m128 t2 = splat_x(_mm_set_ss(t));
     __m128 t3 = _mm_sub_ps(_mm_set_ps1(1.0f), t2);
