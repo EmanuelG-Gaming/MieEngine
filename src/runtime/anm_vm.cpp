@@ -1299,20 +1299,20 @@ interrupt:
                         opcode = 0; // Nop.
 
                         // '64' is the labelInterrupt.
-                        if ((currentOpcode == 64 && self->pendingInterrupt == self->currentInstr->args[0].i)
+                        if ((currentOpcode == ANM_INTERRUPT_LABEL && self->pendingInterrupt == self->currentInstr->args[0].i)
                            || currentOpcode == -1)
                         {
                             break;
                         }
 
-                        if (currentOpcode == 64 && self->currentInstr->args[0].i == -1)
+                        if (currentOpcode == ANM_INTERRUPT_LABEL && self->currentInstr->args[0].i == -1)
                         {
                             instrInterrupt = self->currentInstr;
                         }
                         break;
                     }
 
-                    if (self->currentInstr->opcode == 64 ||
+                    if (self->currentInstr->opcode == ANM_INTERRUPT_LABEL ||
                         (self->currentInstr = instrInterrupt, instrInterrupt != NULL))
                     {
                         // Do something with the timer.

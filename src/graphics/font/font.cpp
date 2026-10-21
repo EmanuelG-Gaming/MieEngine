@@ -1028,11 +1028,11 @@ static const TextDrawStyle defaultStyle = CLITERAL(TextDrawStyle) {
     */
 };
 
-extern int DrawTextGetSize(GFX_font* font, const char* text,
+extern int DrawTextGetSize(GFX_font* font, const char* text, int stringLen,
     i32 fontHeight, float spacingX, float spacingY, float scale,
     float* w, float* h)
 {
-    if (!strlen(text))
+    if (!stringLen)
     {
         return -1;
     }
@@ -1059,7 +1059,8 @@ extern int DrawTextGetSize(GFX_font* font, const char* text,
     float lastValidHeight = 0;
 
     const char* ptr = text;
-    for (; *ptr;)
+    const char* topAddr = text + stringLen;
+    for (; *ptr && ptr < topAddr;)
     {
         if (*ptr == '\n')
         {
@@ -1203,17 +1204,16 @@ extern int DrawTextPro(GFX_font* font, const char* text, float ox, float oy,
 */
 
 
-extern int DrawTextPro(GFX_font* font, const char* text,
+extern int DrawTextPro(GFX_font* font, const char* text, int stringLen,
     int fontHeight, float spacingX, float spacingY, float scale,
     int flags, const TextDrawStyle* options)
 {
     if (options == NULL)
     {
-        return DrawTextPro(font, text, fontHeight, spacingX, spacingY, scale,
+        return DrawTextPro(font, text, stringLen, fontHeight, spacingX, spacingY, scale,
             flags, &defaultStyle);
     }
 
-    int stringLen = strlen(text);
     if (!stringLen)
     {
         return 0;
@@ -1281,7 +1281,8 @@ extern int DrawTextPro(GFX_font* font, const char* text,
 
     int nFaces = 0;
     const char* ptr = text;
-    for (; *ptr; )
+    const char* topAddr = text + stringLen;
+    for (; *ptr && ptr < topAddr; )
     {
         if (*ptr == '\n')
         {

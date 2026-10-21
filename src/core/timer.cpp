@@ -6,6 +6,7 @@ void Timer::set(Timer *self, int time)
 {
     if ((self->isInitialized & 1U) == 0)
     {
+        // If not initialized.
         self->currentF = 0.0f;
         self->current = 0;
         self->previous = -99999;

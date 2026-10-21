@@ -222,11 +222,11 @@ extern GFX_texture* FontUploadTexture(GFX_font* font, int pageIndex, int flags);
    Text renderer.
 */
 
-extern int DrawTextGetSize(GFX_font* font, const char* text,
+extern int DrawTextGetSize(GFX_font* font, const char* text, int len,
     i32 fontHeight, float spacingX, float spacingY, float scale,
     float* w, float* h);
 
-extern int DrawTextPro(GFX_font* font, const char* text,
+extern int DrawTextPro(GFX_font* font, const char* text, int len,
     int fontHeight, float spacingX, float spacingY, float scale,
     int flags, const TextDrawStyle* options);
 
