@@ -30,6 +30,8 @@ template <typename T>
 struct Interp {
     T initial;
     T goal;
+    T currentVal;
+
     T bezier1;
     T bezier2;
     Timer timer;

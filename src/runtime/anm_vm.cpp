@@ -48,6 +48,7 @@ void AnmVM::init(AnmVM* self)
     self->nPoints = 3;
 
 
+
     self->pendingInterrupt = 0;
     self->interruptReturnInstr = NULL;
 
@@ -57,20 +58,23 @@ void AnmVM::init(AnmVM* self)
     Mat4Ident(&self->matrix, 1.0f);
 
     // Interpolations.
+    self->timeInScript.set(&self->timeInScript, 0);
     self->timeInScript.current = 0;
     self->timeInScript.currentF = 0.0f;
+
 
     self->posInterp.endTime = 0;
     self->rotationInterp.endTime = 0;
     self->scaleInterp.endTime = 0;
 
     self->rgbInterp.endTime = 0;
-    self->alphaInterp.endTime = 0;
-
     self->rgb2Interp.endTime = 0;
+    self->alphaInterp.endTime = 0;
     self->alpha2Interp.endTime = 0;
 
-    self->flags = 0;
+
+
+    self->flags = { 0 };
 }
 
 
@@ -283,7 +287,7 @@ void AnmVM::loadIntoAnmVM(AnmVM *self, AnmLoaded *anmLoaded, int scriptNumber)
         init(self);
         self->scriptNumber = (uint16_t) scriptNumber;
         anmIndex = anmLoaded->anmSlotIndex;
-        self->flags = self->flags & 0xfffff9ff;
+        //self->flags = self->flags & 0xfffff9ff;
         self->anmFileIndex = (uint16_t) anmIndex;
         self->anmLoaded = anmLoaded;
         instr = (AnmVM_rawInstr *) &anmLoaded->spriteData[scriptNumber];
@@ -291,7 +295,8 @@ void AnmVM::loadIntoAnmVM(AnmVM *self, AnmLoaded *anmLoaded, int scriptNumber)
         self->currentInstr = instr;
 
         self->timeInScript.set(&self->timeInScript, 0);
-        self->flags &= 0xfffffffe;
+        //self->flags &= 0xfffffffe;
+
 
         ++g_anmManager->allocatedVmCountMaybe;
         return;
@@ -310,14 +315,19 @@ void AnmVM::loadSingleAnmScript(AnmVM *self, AnmLoaded *anmLoaded, uint32_t scri
     }
 
     self->scriptNumber = scriptNumber;
-    self->flags = 0xfffff9ff;
+    //self->flags = 0xfffff9ff;
+    self->flags = { 0 };
+    self->flags.visible |= TRUE;
+
     self->anmFileIndex = anmLoaded->anmSlotIndex;
     self->anmLoaded = anmLoaded;
     AnmVM_rawInstr* startInstr = (AnmVM_rawInstr *) &anmLoaded->spriteData[scriptNumber];
     self->startOfScript = startInstr;
     self->currentInstr = startInstr;
     self->timeInScript.set(&self->timeInScript, 0);
-    self->flags &= ~1;
+    //self->flags &= ~1;
+    self->flags.stopped = FALSE;
+
 
     ++g_anmManager->allocatedVmCountMaybe;
 }
@@ -345,42 +355,6 @@ void AnmVM::loadScript(AnmVM* self, AnmVM_rawInstr* instr)
     */
 }
 
-
-void AnmVM::update(AnmVM* self)
-{
-    // UV scrolling?
-    /*
-    float t = self->posInterp.timer.currentF / (float) self->posInterp.endTime;
-
-    // Interpolating.
-    //self->pos.x = (self->posInterp.goal.x - self->posInterp.initial.x) * t + self->posInterp.initial.x;
-    //self->pos.y = (self->posInterp.goal.y - self->posInterp.initial.y) * t + self->posInterp.initial.y;
-    //self->pos.z = (self->posInterp.goal.z - self->posInterp.initial.z) * t + self->posInterp.initial.z;
-
-    self->posInterp.step(&self->posInterp);
-    */
-
-    self->scale.x += self->scaleGrowth.x;
-    self->scale.y += self->scaleGrowth.y;
-
-    self->rotation.x += self->angularVelocity.x;
-    self->rotation.y += self->angularVelocity.y;
-    self->rotation.z += self->angularVelocity.z;
-
-    //fprintf(stderr, "scaleGrowth x:%f y:%f\n", self->scaleGrowth.x, self->scaleGrowth.y);
-
-    //fprintf(stderr, "scmonkeys\n");
-    if (0)
-    {
-        fprintf(stderr, "INTEPOLATION DEBUG!\n");
-        //fprintf(stderr, "t: %f\n", t);
-        fprintf(stderr, "posInterpGoal(%f, %f, %f)\n", self->posInterp.goal.x, self->posInterp.goal.y, self->posInterp.goal.z);
-        fprintf(stderr, "posInterpInitial(%f, %f, %f)\n", self->posInterp.initial.x, self->posInterp.initial.y, self->posInterp.initial.z);
-        fprintf(stderr, "pos(%f, %f, %f)\n", self->pos.x, self->pos.y, self->pos.z);
-        fprintf(stderr, "\n");
-    }
-
-}
 
 void AnmVM::draw(AnmVM* self, AnmVM* parent)
 {
@@ -446,13 +420,11 @@ void AnmVM::draw(AnmVM* self, AnmVM* parent)
     {
         case ANM_DRAW_RECT:
         {
-            if (self->flags & ANM_FLAG_LINE_THROUGH)
+            if (self->flags.shape & ANM_FLAG_LINE_THROUGH)
             {
                 // Do nothing here.
-
-
             }
-            else if (self->flags & ANM_FLAG_LINE)
+            else if (self->flags.shape & ANM_FLAG_LINE)
             {
                 DrawMatScale3D(self->spriteSize.x*self->scale.x, self->spriteSize.y*self->scale.y, 1.0f);
                 DrawArcSector(4, 0, PI2, self->radius1, self->radius2);
@@ -465,13 +437,11 @@ void AnmVM::draw(AnmVM* self, AnmVM* parent)
 
         case ANM_DRAW_ELLIPSE:
         {
-            if (self->flags & ANM_FLAG_LINE_THROUGH)
+            if (self->flags.shape & ANM_FLAG_LINE_THROUGH)
             {
                 // Do nothing here.
-
-
             }
-            else if (self->flags & ANM_FLAG_LINE)
+            else if (self->flags.shape & ANM_FLAG_LINE)
             {
                 DrawMatScale3D(self->spriteSize.x*self->scale.x, self->spriteSize.y*self->scale.y, 1.0f);
                 DrawArcSector(self->nPoints, 0, PI2, self->radius1, self->radius2);
@@ -486,11 +456,12 @@ void AnmVM::draw(AnmVM* self, AnmVM* parent)
         case ANM_DRAW_STAR:
         {
             puts("to implement draw star");
-            if (self->flags & ANM_FLAG_LINE_THROUGH)
+
+            if (self->flags.shape & ANM_FLAG_LINE_THROUGH)
             {
 
             }
-            else if (self->flags & ANM_FLAG_LINE)
+            else if (self->flags.shape & ANM_FLAG_LINE)
             {
             }
             else
@@ -524,12 +495,12 @@ void AnmVM::run(AnmVM* self)
         float gameSpeed = gGameSpeed;
         gGameSpeed = 1.0f;
 
-        AnmVM_rawInstr* instrInterrupt = NULL;
+        AnmVM_rawInstr* currentInstr = self->currentInstr;
         uint32_t opcode = self->currentInstr->opcode;
 
         if (self->pendingInterrupt != 0)
         {
-            goto interrupt;
+            goto doInterrupt;
         }
 
         if (self->currentInstr->time > self->timeInScript.current)
@@ -548,7 +519,8 @@ void AnmVM::run(AnmVM* self)
             // Destroys the VM.
             case ANM_DESTROY: // destroy()
             {
-                self->flags &= ~1;
+                self->flags.stopped |= TRUE;
+
                 self->currentInstr = NULL;
                 gGameSpeed = gameSpeed;
             } break;
@@ -564,7 +536,7 @@ void AnmVM::run(AnmVM* self)
             case ANM_SPRITE: // sprite(int id)
             {
                 int spriteNumber = self->getIntArg(0);
-                self->flags |= 1;
+                //self->flags |= 1;
 
                 // Draw a certain sprite here.
             } break;
@@ -1062,7 +1034,7 @@ void AnmVM::run(AnmVM* self)
                 float py = self->getFloatArg(1);
                 float pz = self->getFloatArg(2);
 
-                if ((self->flags & 0x100) == 0) {
+                if ((self->flags.useOffsets) == 0) {
                     self->pos = { px, py, pz };
                 } else {
                     self->offsetPos = { px, py, pz };
@@ -1105,7 +1077,21 @@ void AnmVM::run(AnmVM* self)
                 self->color1[0] = r / 255.0f;
                 self->color1[1] = g / 255.0f;
                 self->color1[2] = b / 255.0f;
+
+                fprintf(stderr, "is this even called?\n");
             } break;
+
+            case ANM_COLOR2: // color2(int r, int g, int b)
+            {
+                int r = self->getIntArg(0);
+                int g = self->getIntArg(1);
+                int b = self->getIntArg(2);
+
+                self->color2[0] = r / 255.0f;
+                self->color2[1] = g / 255.0f;
+                self->color2[2] = b / 255.0f;
+            } break;
+
 
             // Set a constant angular velocity, in rads per frame.
             case ANM_ANGLE_VEL: // angleVel(float x, float y, float z)
@@ -1148,11 +1134,10 @@ void AnmVM::run(AnmVM* self)
                 float y = self->getFloatArg(3);
                 float z = self->getFloatArg(4);
 
-                uint32_t flagsLow = self->flags;
                 self->posInterp.endTime = t;
                 self->posInterp.method = static_cast<InterpMethod>(mode);
 
-                if ((flagsLow & 0x100) == 0)
+                if ((self->flags.useOffsets & 0x100) == 0)
                 {
                     // Initial position that we want to interpolate with.
                     self->posInterp.initial = self->pos;
@@ -1183,6 +1168,8 @@ void AnmVM::run(AnmVM* self)
                 self->rgbInterp.endTime = t;
                 self->rgbInterp.method = static_cast<InterpMethod>(mode);
 
+                self->rgbInterp.initial = { self->color1[0], self->color1[1], self->color1[2] };
+
                 self->rgbInterp.goal = { r / 255.0f, g / 255.0f, b / 255.0f };
                 self->rgbInterp.timer.set(&self->rgbInterp.timer, 0);
             } break;
@@ -1195,6 +1182,8 @@ void AnmVM::run(AnmVM* self)
 
                 self->alphaInterp.endTime = t;
                 self->alphaInterp.method = static_cast<InterpMethod>(mode);
+
+                self->alphaInterp.initial = { self->color1[3] };
 
                 self->alphaInterp.goal = { a / 255.0f };
                 self->alphaInterp.timer.set(&self->alphaInterp.timer, 0);
@@ -1211,6 +1200,8 @@ void AnmVM::run(AnmVM* self)
                 self->rgb2Interp.endTime = t;
                 self->rgb2Interp.method = static_cast<InterpMethod>(mode);
 
+                self->rgb2Interp.initial = { self->color2[0], self->color2[1], self->color2[2] };
+
                 self->rgb2Interp.goal = { r / 255.0f, g / 255.0f, b / 255.0f };
                 self->rgb2Interp.timer.set(&self->rgb2Interp.timer, 0);
             } break;
@@ -1223,6 +1214,8 @@ void AnmVM::run(AnmVM* self)
 
                 self->alpha2Interp.endTime = t;
                 self->alpha2Interp.method = static_cast<InterpMethod>(mode);
+
+                self->alpha2Interp.initial = { self->color2[3] };
 
                 self->alpha2Interp.goal = { a / 255.0f };
                 self->alpha2Interp.timer.set(&self->alpha2Interp.timer, 0);
@@ -1276,61 +1269,55 @@ void AnmVM::run(AnmVM* self)
             // This is like stop, except it also hides the graphics by clearing the visibility flag.
             // Interpolation instructions like posTime will continue to advance, and interrupts can be triggered at any time.
             // Successful interrupts will automatically re-enable the visibility flag.
-            case ANM_STOPHIDE: // stopHide
+            case ANM_HALT: // halt
             {
-                self->flags &= 0xfffffffe;
-
 stmt:
                 if (self->pendingInterrupt == 0)
                 {
-                    self->flags |= 0x1000;
+                    self->flags.stopped |= TRUE;
+                    self->timeInScript.addf(&self->timeInScript, -1.0f);
+                    goto breakInterpreter;
                 }
                 else
                 {
                     // We call interrupt now.
-interrupt:
-                    self->currentInstr = self->startOfScript;
-                    instrInterrupt = NULL;
+doInterrupt:
+                    AnmVM_rawInstr* instrInterrupt = NULL;
+                    currentInstr = self->startOfScript;
 
-                    // Selects which interrupt to run.
-                    while (1)
+                    // Search for instruction with interrupt label.
+                    while ((currentInstr->opcode != ANM_INTERRUPT_LABEL ||
+                            self->pendingInterrupt != currentInstr->args[0].i)
+                        && currentInstr->opcode != ANM_DESTROY) // The finishing instructions.
                     {
-                        int16_t currentOpcode = self->currentInstr->opcode;
-                        opcode = 0; // Nop.
-
-                        // '64' is the labelInterrupt.
-                        if ((currentOpcode == ANM_INTERRUPT_LABEL && self->pendingInterrupt == self->currentInstr->args[0].i)
-                           || currentOpcode == -1)
+                        if (currentInstr->opcode == ANM_INTERRUPT_LABEL && currentInstr->args[0].i == -1)
                         {
-                            break;
+                            instrInterrupt = currentInstr;
                         }
-
-                        if (currentOpcode == ANM_INTERRUPT_LABEL && self->currentInstr->args[0].i == -1)
-                        {
-                            instrInterrupt = self->currentInstr;
-                        }
-                        break;
+                        currentInstr = currentInstr + 1;
                     }
 
-                    if (self->currentInstr->opcode == ANM_INTERRUPT_LABEL ||
-                        (self->currentInstr = instrInterrupt, instrInterrupt != NULL))
-                    {
-                        // Do something with the timer.
-                        self->interruptReturnTime.previous = self->timeInScript.previous;
-                        self->interruptReturnTime.current = self->timeInScript.current;
-                        self->interruptReturnTime.currentF = self->timeInScript.currentF;
-                        self->interruptReturnTime.gameSpeed = self->timeInScript.gameSpeed;
-                        self->interruptReturnTime.isInitialized = self->timeInScript.isInitialized;
-                        self->interruptReturnInstr = self->currentInstr;
-                        self->timeInScript.set(&self->timeInScript, self->currentInstr->time);
-                        self->pendingInterrupt = self->currentInstr->offsetToNextInstr;
-                        //self->flags |= 1;
+                    // Reset.
+                    self->pendingInterrupt = 0;
+                    self->flags.stopped = FALSE;
 
-                        break;
+                    if (currentInstr->opcode != ANM_INTERRUPT_LABEL)
+                    {
+                        if (instrInterrupt == NULL)
+                        {
+                            self->timeInScript.addf(&self->timeInScript, -1.0f);
+                            goto breakInterpreter;
+                        }
+                        currentInstr = instrInterrupt;
                     }
+
+                    currentInstr = currentInstr + 1;
+                    self->currentInstr = currentInstr;
+                    self->timeInScript.set(&self->timeInScript, self->currentInstr->time);
+                    self->flags.visible |= TRUE;
+
+                    continue;
                 }
-
-                self->timeInScript.addf(&self->timeInScript, -1.0f);
             } break;
 
             case ANM_DRAWMODE: // drawMode(int mode)
@@ -1377,4 +1364,96 @@ interrupt:
             self->loadNextInstr();
         }
     }
+
+    // This is gonna run afterwards.
+breakInterpreter:
+
+    fprintf(stderr, "%s: ok\n", __func__);
+
+    // We update the interpolations when we halt the VM.
+    if (self->angularVelocity.x != 0.0f)
+    {
+        self->rotation.x += self->angularVelocity.x;
+    }
+    if (self->angularVelocity.y != 0.0f)
+    {
+        self->rotation.y += self->angularVelocity.y;
+    }
+    if (self->angularVelocity.z != 0.0f)
+    {
+        self->rotation.z += self->angularVelocity.z;
+    }
+
+    // Scaling.
+    if (self->scaleGrowth.x != 0.0f)
+    {
+        self->scale.x += self->scaleGrowth.x;
+    }
+    if (self->scaleGrowth.y != 0.0f)
+    {
+        self->scale.y += self->scaleGrowth.y;
+    }
+
+    // Position interpolation.
+    if (self->posInterp.endTime > 0)
+    {
+        self->posInterp.step(&self->posInterp);
+    }
+    if (self->alphaInterp.endTime > 0)
+    {
+        self->alphaInterp.step(&self->alphaInterp);
+    }
+    if (self->alpha2Interp.endTime > 0)
+    {
+        self->alpha2Interp.step(&self->alpha2Interp);
+    }
+
+    if (self->rgbInterp.endTime > 0)
+    {
+        self->rgbInterp.step(&self->rgbInterp);
+    }
+    if (self->rgb2Interp.endTime > 0)
+    {
+        self->rgb2Interp.step(&self->rgbInterp);
+    }
+
+    self->timeInScript.increment(&self->timeInScript);
+
+    // Now set the variables.
+    if (self->posInterp.endTime > 0)
+    {
+        if (self->flags.useOffsets)
+        {
+            self->offsetPos = self->posInterp.currentVal;
+        }
+        else
+        {
+            self->pos = self->posInterp.currentVal;
+        }
+    }
+
+    if (self->alphaInterp.endTime > 0)
+    {
+        self->color1[3] = self->alphaInterp.currentVal;
+    }
+    if (self->alpha2Interp.endTime > 0)
+    {
+        self->color2[3] = self->alphaInterp.currentVal;
+    }
+
+    if (self->rgbInterp.endTime > 0)
+    {
+        self->color1[0] = self->rgbInterp.currentVal.x;
+        self->color1[1] = self->rgbInterp.currentVal.y;
+        self->color1[2] = self->rgbInterp.currentVal.z;
+    }
+    if (self->rgb2Interp.endTime > 0)
+    {
+        self->color2[0] = self->rgbInterp.currentVal.x;
+        self->color2[1] = self->rgbInterp.currentVal.y;
+        self->color2[2] = self->rgbInterp.currentVal.z;
+    }
+
+
+
 }

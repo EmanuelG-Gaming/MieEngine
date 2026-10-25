@@ -83,10 +83,10 @@ static int Camera3ProcessInput(CAMERA3D* cam, float dt)
     controller.vel = vel;
 
     // Also the mouse.
-    controller.xoffset = (input.mouseXPos - controller.lastX) * controller.sensitivity;
-    controller.yoffset = (controller.lastY - input.mouseYPos) * controller.sensitivity;
-    controller.lastX = input.mouseXPos;
-    controller.lastY = input.mouseYPos;
+    controller.xoffset = (input.mouseCurrentPos.x - controller.lastX) * controller.sensitivity;
+    controller.yoffset = (controller.lastY - input.mouseCurrentPos.y) * controller.sensitivity;
+    controller.lastX = input.mouseCurrentPos.x;
+    controller.lastY = input.mouseCurrentPos.y;
 
     return 0;
 }

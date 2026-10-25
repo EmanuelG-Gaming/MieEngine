@@ -389,7 +389,9 @@ void AnmManager::makeVmWithAnmLoaded(AnmLoaded *anmLoaded, int scriptNumber, int
     AnmManager* self = g_anmManager;
     // enterCriticalSection(9);
     AnmVM* vm = allocateVm();
-    vm->flags |= 0x4000000;
+    //vm->flags |= 0x4000000;
+    // TODO:
+
     vm->layer = anmVmLayer;
 
     //vm->loadAnmScript(vm, anmLoaded, scriptNumber);
@@ -498,7 +500,8 @@ void AnmManager::loadIntoAnmVm(AnmVM *vm, AnmLoaded *anmLoaded, int scriptNumber
     {
         vm->init(vm);
         vm->scriptNumber = static_cast<uint16_t> (scriptNumber);
-        vm->flags &= 0xffffff9ff;
+        //vm->flags &= 0xffffff9ff;
+
         vm->anmFileIndex = static_cast<uint16_t> (anmLoaded->anmSlotIndex);
         vm->anmLoaded = anmLoaded;
 
@@ -507,7 +510,8 @@ void AnmManager::loadIntoAnmVm(AnmVM *vm, AnmLoaded *anmLoaded, int scriptNumber
         vm->startOfScript = instr;
         vm->currentInstr = instr;
         vm->timeInScript.set(&vm->timeInScript, 0);
-        vm->flags &= 0xffffffffffe;
+        //vm->flags &= 0xffffffffffe;
+
 
         // Run instructions already!
         vm->run(vm);
@@ -559,7 +563,7 @@ void AnmManager::spawnVmAtPosition(AnmLoaded *anmLoaded, uint32_t scriptNumber, 
 {
     // enterCriticalSection(9);
     AnmVM* vm = allocateVm();
-    vm->flags |= 0x4000000;
+    //vm->flags |= 0x4000000;
     vm->layer = layer;
     //vm->loadAnmScript(vm, anmLoaded, scriptNumber);
     vm->loadIntoAnmVM(vm, anmLoaded, scriptNumber);
@@ -694,7 +698,8 @@ void AnmManager::renderLayer(AnmManager* self, int layer)
     while (vm->nextInLayerList)
     {
         // We can draw with layers?
-        if ((vm->flags & 0x4000000) == 0)
+        //if ((vm->flags & 0x4000000) == 0)
+        if (vm->flags.visible)
         {
             if (vm->onDraw)
             {
@@ -736,7 +741,8 @@ void AnmManager::onTick(void* args)
     {
         vm = list->entry;
         list = list->next;
-        if ((vm->flags & 0x400000) == 0)
+        //if ((vm->flags & 0x400000) == 0)
+        if (vm->flags.visible)
         {
             // ChainCallbackResult result;
             if (vm->onTick)

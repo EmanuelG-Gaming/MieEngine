@@ -130,10 +130,12 @@ typedef enum AnmVM_opcodes {
     ANM_TYPE = 67,
 
     ANM_LAYER = 68,
-    ANM_STOPHIDE = 69,
+    ANM_HALT = 69,
 
     ANM_DRAWMODE = 70,
     ANM_REGULAR_POLY = 71,
+
+    ANM_COLOR2 = 72,
 } AnmVM_opcodes;
 
 
@@ -156,16 +158,6 @@ typedef enum AnmVM_registers {
     ANM_FRAND = 10022,
 } AnmVM_registers;
 
-
-/*
-*/
-
-/*
-typedef enum AnmValueType {
-    ANM_VALUE_INT,
-    ANM_VALUE_FLOAT,
-} AnmValueType;
-*/
 
 typedef union AnmAnyVar {
     i32 i;
@@ -225,7 +217,6 @@ public:
     ColorMode colorMode;
     AnmVM_rotMode rotationMode;
 
-    //vec3 position1Interp, position2Interp;
     vec3 pos;
     vec3 offsetPos;
     vec3 entityPos;
@@ -263,7 +254,13 @@ public:
     Timer timeInScript;
 
     AnmVM_drawMode drawMode;
-    int32_t flags;
+
+    struct {
+        i32 visible : 1;
+        i32 stopped : 1;
+        i32 useOffsets : 1;
+        i32 shape : 13;
+    } flags;
 
     AnmID id;
     uint16_t scriptNumber;
@@ -274,12 +271,6 @@ public:
     float radius1, radius2;
     int nPoints;
 
-
-    //float color1[4];
-    //float color2[4];
-
-    //const char* s;
-    //int sLen;
 
     AnmVM(void);
     ~AnmVM(void);
@@ -303,7 +294,6 @@ public:
     static void setColor(AnmVM* self, float r, float g, float b, float a);
     static void setColor2(AnmVM* self, float r, float g, float b, float a);
 
-    static void update(AnmVM* self);
     static void draw(AnmVM* self, AnmVM* parent);
     static void run(AnmVM* self);
 

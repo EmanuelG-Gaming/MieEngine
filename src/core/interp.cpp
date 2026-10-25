@@ -1,41 +1,50 @@
 #include "core/interp.h"
+#include "base/math/mathf.h"
+
+#include <stdio.h>
 
 template <typename T>
 void Interp<T>::step(Interp<T>* self)
 {
+    // EndTime should be positive,
+    // because otherwise if it's zero, it would be a division error.
     if (self->endTime > 0)
     {
         Timer::increment(&self->timer);
 
         if (self->endTime <= self->timer.current)
         {
+            // We reset the counter once the interpolation ends.
             self->timer.set(&self->timer, self->endTime);
             self->endTime = 0;
 
             if (self->method != InterpMethod::cubicHermite)
             {
-                return self->goal;
+                //return self->goal;
+                return;
             }
         }
     }
 
     switch (self->method)
     {
+        // Some special interpolation methods.
         case InterpMethod::linear:
         {
-            self->initial = self->initial + self->goal;
+            self->currentVal = self->initial + self->goal;
         } break;
 
         case InterpMethod::physics:
         {
             // Overshoot?
-            self->initial = self->initial + self->bezier2;
+            self->currentVal = self->initial + self->bezier2;
             self->bezier2 = self->bezier2 + self->goal;
         } break;
 
         case InterpMethod::cubicHermite:
         {
             float t = self->timer.currentF / (float) self->endTime;
+
             float t2 = t*t;
             float t3 = t2*t;
             float h00 = (2.0f*t3) - (3.0f*t2) + 1.0f;
@@ -47,7 +56,7 @@ void Interp<T>::step(Interp<T>* self)
             T term2 = self->bezier1 * h10;
             T term3 = self->goal * h01;
             T term4 = self->bezier2 * h11;
-            self->initial = term1+term2+term3+term4;
+            self->currentVal = term1+term2+term3+term4;
         } break;
 
         default:
@@ -55,7 +64,8 @@ void Interp<T>::step(Interp<T>* self)
             float alpha = interpolate(self);
             T delta = self->goal - self->initial;
             T offset = delta*alpha;
-            self->initial = self->initial + offset;
+            self->currentVal = self->initial + offset;
+            //fprintf(stderr, "aeaeaeae\n");
         } break;
     }
 }
@@ -65,7 +75,7 @@ float Interp<T>::interpolate(Interp<T>* self)
 {
     float t = self->timer.currentF / self->endTime;
 
-    switch (method)
+    switch (self->method)
     {
         case InterpMethod::in2:
             return pow2(t);
@@ -115,3 +125,9 @@ float Interp<T>::interpolate(Interp<T>* self)
     }
 }
 
+/*
+   Explicit template instantiations.
+*/
+
+template void Interp<float>::step(Interp<float>* self);
+template void Interp<vec3>::step(Interp<vec3>* self);
