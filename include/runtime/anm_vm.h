@@ -136,6 +136,7 @@ typedef enum AnmVM_opcodes {
     ANM_REGULAR_POLY = 71,
 
     ANM_COLOR2 = 72,
+    ANM_ALPHA2 = 73,
 } AnmVM_opcodes;
 
 

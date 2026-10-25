@@ -43,7 +43,7 @@ struct Interp {
     constexpr float pow4(float t) { return t*t*t*t; }
 
     void step(Interp<T>* self);
-    float interpolate(Interp<T>* self);
+    float interpolate(Interp<T>* self, float t);
 };
 
 

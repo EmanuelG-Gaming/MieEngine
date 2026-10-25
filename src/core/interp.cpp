@@ -7,74 +7,89 @@ template <typename T>
 void Interp<T>::step(Interp<T>* self)
 {
     // EndTime should be positive,
-    // because otherwise if it's zero, it would be a division error.
+    // because otherwise if it's zero, calculating 't' would be a division error.
     if (self->endTime > 0)
     {
+        // Either this
         Timer::increment(&self->timer);
 
-        if (self->endTime <= self->timer.current)
+        float t = self->timer.currentF / (float) self->endTime;
+        /*
+        if (t >= 1.0f)
+        {
+            t = 1.0f;
+        }
+        */
+
+        switch (self->method)
+        {
+            // Some special interpolation methods.
+            case InterpMethod::linear:
+            {
+                self->currentVal = self->initial + self->goal;
+            } break;
+
+            case InterpMethod::physics:
+            {
+                // Overshoot?
+                self->currentVal = self->initial + self->bezier2;
+                self->bezier2 = self->bezier2 + self->goal;
+            } break;
+
+            case InterpMethod::cubicHermite:
+            {
+                float t = self->timer.currentF / (float) self->endTime;
+
+                float t2 = t*t;
+                float t3 = t2*t;
+                float h00 = (2.0f*t3) - (3.0f*t2) + 1.0f;
+                float h10 = t3 - (2.0f*t2) + t;
+                float h01 = (-2.0f*t3) + (3.0f*t2);
+                float h11 = t3 - t2;
+
+                T term1 = self->initial * h00;
+                T term2 = self->bezier1 * h10;
+                T term3 = self->goal * h01;
+                T term4 = self->bezier2 * h11;
+                self->currentVal = term1+term2+term3+term4;
+            } break;
+
+            default:
+            {
+                float alpha = interpolate(self, t);
+                T delta = self->goal - self->initial;
+                T offset = delta*alpha;
+
+                // Use some better approximations.
+                // A(t) = A0 + (A1-A0)*t
+                // A(t) = A0 + A1*t - A0*t.
+                // A(t) = A0*(1-t) + A1*t.
+                self->currentVal = self->goal*alpha + self->initial*(1 - alpha);
+            } break;
+        }
+
+
+        if (self->timer.current >= self->endTime)
         {
             // We reset the counter once the interpolation ends.
             self->timer.set(&self->timer, self->endTime);
+            self->currentVal = self->goal;
             self->endTime = 0;
 
             if (self->method != InterpMethod::cubicHermite)
             {
-                //return self->goal;
                 return;
             }
         }
-    }
 
-    switch (self->method)
-    {
-        // Some special interpolation methods.
-        case InterpMethod::linear:
-        {
-            self->currentVal = self->initial + self->goal;
-        } break;
-
-        case InterpMethod::physics:
-        {
-            // Overshoot?
-            self->currentVal = self->initial + self->bezier2;
-            self->bezier2 = self->bezier2 + self->goal;
-        } break;
-
-        case InterpMethod::cubicHermite:
-        {
-            float t = self->timer.currentF / (float) self->endTime;
-
-            float t2 = t*t;
-            float t3 = t2*t;
-            float h00 = (2.0f*t3) - (3.0f*t2) + 1.0f;
-            float h10 = t3 - (2.0f*t2) + t;
-            float h01 = (-2.0f*t3) + (3.0f*t2);
-            float h11 = t3 - t2;
-
-            T term1 = self->initial * h00;
-            T term2 = self->bezier1 * h10;
-            T term3 = self->goal * h01;
-            T term4 = self->bezier2 * h11;
-            self->currentVal = term1+term2+term3+term4;
-        } break;
-
-        default:
-        {
-            float alpha = interpolate(self);
-            T delta = self->goal - self->initial;
-            T offset = delta*alpha;
-            self->currentVal = self->initial + offset;
-            //fprintf(stderr, "aeaeaeae\n");
-        } break;
+        // Or this.
+        //Timer::increment(&self->timer);
     }
 }
 
 template <typename T>
-float Interp<T>::interpolate(Interp<T>* self)
+float Interp<T>::interpolate(Interp<T>* self, float t)
 {
-    float t = self->timer.currentF / self->endTime;
-
     switch (self->method)
     {
         case InterpMethod::in2:

@@ -35,8 +35,7 @@ void Timer::addf(Timer *self, float amount)
 
 int Timer::increment(Timer* self)
 {
-    //float gameSpeed = *self->gameSpeed;
-    float gameSpeed = gGameSpeed;
+    float gameSpeed = *self->gameSpeed;
 
     self->previous = self->current;
     if (0.99f < gameSpeed && gameSpeed < 1.01f)

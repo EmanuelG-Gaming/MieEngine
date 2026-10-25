@@ -402,6 +402,9 @@ void AnmVM::draw(AnmVM* self, AnmVM* parent)
     DrawColor(c1[0], c1[1], c1[2], c1[3]);
     DrawColor2(c2[0], c2[1], c2[2], c2[3]);
 
+    //fprintf(stderr, "color1 (%f %f %f %f)\n", c1[0], c1[1], c1[2], c1[3]);
+    //fprintf(stderr, "color2 (%f %f %f %f)\n", c2[0], c2[1], c2[2], c2[3]);
+
     float rot[3];
     chooseRotations(parent, &rot[0], &rot[1], &rot[2]);
 
@@ -1068,6 +1071,12 @@ void AnmVM::run(AnmVM* self)
                 self->color1[3] = alpha / 255.0f;
             } break;
 
+            case ANM_ALPHA2: // alpha2(int alpha)
+            {
+                int alpha = self->getIntArg(0);
+                self->color2[3] = alpha / 255.0f;
+            } break;
+
             case ANM_COLOR: // color(int r, int g, int b)
             {
                 int r = self->getIntArg(0);
@@ -1077,8 +1086,6 @@ void AnmVM::run(AnmVM* self)
                 self->color1[0] = r / 255.0f;
                 self->color1[1] = g / 255.0f;
                 self->color1[2] = b / 255.0f;
-
-                fprintf(stderr, "is this even called?\n");
             } break;
 
             case ANM_COLOR2: // color2(int r, int g, int b)
@@ -1141,16 +1148,13 @@ void AnmVM::run(AnmVM* self)
                 {
                     // Initial position that we want to interpolate with.
                     self->posInterp.initial = self->pos;
-                    fprintf(stderr, "posTime: holy shit (global pos)\n");
                 }
                 else
                 {
                     self->posInterp.initial = self->offsetPos;
-                    fprintf(stderr, "posTime: no. (offset pos)\n");
                 }
 
                 self->posInterp.goal = { x, y, z };
-                fprintf(stderr, "This is the goal: (%f %f %f)\n", x, y, z);
 
 
                 self->posInterp.timer.set(&self->posInterp.timer, 0);
@@ -1297,7 +1301,7 @@ doInterrupt:
                         currentInstr = currentInstr + 1;
                     }
 
-                    // Reset.
+                    // Reset the interrupt.
                     self->pendingInterrupt = 0;
                     self->flags.stopped = FALSE;
 
@@ -1367,9 +1371,6 @@ doInterrupt:
 
     // This is gonna run afterwards.
 breakInterpreter:
-
-    fprintf(stderr, "%s: ok\n", __func__);
-
     // We update the interpolations when we halt the VM.
     if (self->angularVelocity.x != 0.0f)
     {
@@ -1398,30 +1399,6 @@ breakInterpreter:
     if (self->posInterp.endTime > 0)
     {
         self->posInterp.step(&self->posInterp);
-    }
-    if (self->alphaInterp.endTime > 0)
-    {
-        self->alphaInterp.step(&self->alphaInterp);
-    }
-    if (self->alpha2Interp.endTime > 0)
-    {
-        self->alpha2Interp.step(&self->alpha2Interp);
-    }
-
-    if (self->rgbInterp.endTime > 0)
-    {
-        self->rgbInterp.step(&self->rgbInterp);
-    }
-    if (self->rgb2Interp.endTime > 0)
-    {
-        self->rgb2Interp.step(&self->rgbInterp);
-    }
-
-    self->timeInScript.increment(&self->timeInScript);
-
-    // Now set the variables.
-    if (self->posInterp.endTime > 0)
-    {
         if (self->flags.useOffsets)
         {
             self->offsetPos = self->posInterp.currentVal;
@@ -1434,26 +1411,32 @@ breakInterpreter:
 
     if (self->alphaInterp.endTime > 0)
     {
+        self->alphaInterp.step(&self->alphaInterp);
         self->color1[3] = self->alphaInterp.currentVal;
     }
     if (self->alpha2Interp.endTime > 0)
     {
-        self->color2[3] = self->alphaInterp.currentVal;
+        self->alpha2Interp.step(&self->alpha2Interp);
+        self->color2[3] = self->alpha2Interp.currentVal;
     }
+
 
     if (self->rgbInterp.endTime > 0)
     {
+        self->rgbInterp.step(&self->rgbInterp);
+
         self->color1[0] = self->rgbInterp.currentVal.x;
         self->color1[1] = self->rgbInterp.currentVal.y;
         self->color1[2] = self->rgbInterp.currentVal.z;
     }
     if (self->rgb2Interp.endTime > 0)
     {
-        self->color2[0] = self->rgbInterp.currentVal.x;
-        self->color2[1] = self->rgbInterp.currentVal.y;
-        self->color2[2] = self->rgbInterp.currentVal.z;
+        self->rgb2Interp.step(&self->rgb2Interp);
+
+        self->color2[0] = self->rgb2Interp.currentVal.x;
+        self->color2[1] = self->rgb2Interp.currentVal.y;
+        self->color2[2] = self->rgb2Interp.currentVal.z;
     }
 
-
-
+    self->timeInScript.increment(&self->timeInScript);
 }
