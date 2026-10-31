@@ -192,7 +192,7 @@ typedef union ALIGN_DECL(16) vec3 {
 #ifdef __cplusplus
     vec3();
     vec3(float all);
-    vec3(float *v);
+    //vec3(float *v);
     vec3(float x, float y);
     vec3(float x, float y, float z);
     vec3(vec4 v);
@@ -229,7 +229,7 @@ typedef union ALIGN_DECL(16) vec4 {
 #ifdef __cplusplus
     vec4();
     vec4(float all);
-    vec4(float *vv);
+    //vec4(float *vv);
     vec4(float xv, float yv);
     vec4(float xv, float yv, float zv);
     vec4(float xv, float yv, float zv, float wv);

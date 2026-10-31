@@ -169,7 +169,14 @@ float AnmVM::getFloatVar(AnmVM* self, float id)
         case ANM_POSZ:
             return self->pos.z;
 
-        // Random number.
+        case ANM_ENTITY_POSX:
+            return self->entityPos.x;
+        case ANM_ENTITY_POSY:
+            return self->entityPos.y;
+        case ANM_ENTITY_POSZ:
+            return self->entityPos.z;
+
+        // Random number (between -1 and 1).
         case ANM_FRAND:
             return RNG_randf32_range(-1.0f, 1.0f);
 
@@ -436,6 +443,22 @@ void AnmVM::draw(AnmVM* self, AnmVM* parent)
             {
                 DrawRect(self->spriteSize.x*self->scale.x, self->spriteSize.y*self->scale.y);
             }
+        } break;
+
+        case ANM_DRAW_BILLBOARD:
+        {
+            if (self->flags.shape & ANM_FLAG_LINE_THROUGH)
+            {
+                // Do nothing here.
+            }
+            else if (self->flags.shape & ANM_FLAG_LINE)
+            {
+            }
+            else
+            {
+                DrawRectBillboard(self->spriteSize.x*self->scale.x, self->spriteSize.y*self->scale.y);
+            }
+
         } break;
 
         case ANM_DRAW_ELLIPSE:

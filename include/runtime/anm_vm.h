@@ -21,6 +21,7 @@ enum class TextDrawMode {
 typedef enum AnmVM_drawMode {
     ANM_DRAW_NONE = 0,
     ANM_DRAW_RECT,
+    ANM_DRAW_BILLBOARD,
     ANM_DRAW_ELLIPSE,
     ANM_DRAW_STAR,
     //ANM_DRAW_TEXT,
@@ -155,6 +156,10 @@ typedef enum AnmVM_registers {
     ANM_POSX = 10013,
     ANM_POSY = 10014,
     ANM_POSZ = 10015,
+
+    ANM_ENTITY_POSX = 10016,
+    ANM_ENTITY_POSY = 10017,
+    ANM_ENTITY_POSZ = 10018,
 
     ANM_FRAND = 10022,
 } AnmVM_registers;

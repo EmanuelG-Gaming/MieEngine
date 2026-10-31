@@ -37,10 +37,13 @@ inline vec3::vec3(float all)
 {
     x = y = z = all;
 }
+
+/*
 inline vec3::vec3(float *v)
 {
     x = v[0]; y = v[1]; z = v[2];
 }
+*/
 
 inline vec3::vec3(float xv, float yv)
 {
@@ -129,15 +132,16 @@ inline vec4::vec4()
 {
     x = y = z = w = 0;
 }
-
 inline vec4::vec4(float all)
 {
     x = y = z = w = all;
 }
+/*
 inline vec4::vec4(float *v)
 {
     x = v[0]; y = v[1]; z = v[2]; w = v[3];
 }
+*/
 
 inline vec4::vec4(float xv, float yv)
 {
