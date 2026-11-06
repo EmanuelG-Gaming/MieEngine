@@ -5,6 +5,11 @@
 #include "base/types.h"
 #include "base/utils.h"
 
+#include <vector>
+#include <map>
+#include <string>
+
+
 /*
    Token lexer.
 */
@@ -49,6 +54,8 @@ typedef enum TokenKind {
     TOKEN_KW_RETURN,
     TOKEN_KW_IF,
 
+    TOKEN_KW_GLOBAL,
+
     TOKEN_STR_LIT,
     TOKEN_CHR_LIT,
     TOKEN_INT_LIT,
@@ -75,9 +82,11 @@ typedef enum TokenKind {
     TOKEN_OP_LES,
     TOKEN_OP_LEQ,
 
-    TOKEN_BW_XOR,
-    TOKEN_BW_OR,
-    TOKEN_BW_AND,
+    TOKEN_OP_BW_XOR,
+    TOKEN_OP_BW_OR,
+    TOKEN_OP_BW_AND,
+    TOKEN_OP_BW_SHL,
+    TOKEN_OP_BW_SHR,
 } TokenKind;
 
 typedef struct FileLocation {
@@ -98,12 +107,14 @@ typedef struct Token {
     Token(TokenKind type, char c, int len) : type(type), sLen(len), next(NULL)
     {
         s[0] = c;
+        s[1] = '\0';
     }
 } Token;
 
 class TokenScanner {
 public:
     const char* baseSource;
+    const char* sourceEnd;
     const char* cursor;
 
     const char* sourceFileName;
@@ -149,7 +160,7 @@ extern int CstrLen(const char* str);
 
 extern const char* TokenKindToStr(TokenKind kind);
 
-#define PrintError(fmt, ...) fprintf(stderr, LOG_FG_BRIGHT_BLUE "%s: " LOG_COLOR_RESET fmt, __func__, ##__VA_ARGS__)
+#define PrintError(fmt, ...) fprintf(stderr, LOG_FG_BRIGHT_BLUE "%s: " LOG_COLOR_RESET "[%d:%d:%.*s]" fmt, __func__, self->cursor->location.line, self->cursor->location.column, TOKEN_FMT(self->cursor), ##__VA_ARGS__)
 #define TOKEN_FMT(token) (int) (token)->sLen, (const char *) (token)->s
 
 
@@ -165,15 +176,25 @@ typedef struct Symbol {
     char val[SYMBOL_STR_MAX+1];
 } Symbol;
 
-struct SymbolTableBucket {
+typedef struct SymbolTableBucket {
     struct SymbolTableBucket* next;
     Symbol symbol;
+} SymbolTableBucket;
+
+typedef struct SymbolTableList {
+    struct SymbolTableBucket* begin;
+    struct SymbolTableBucket* end;
+    struct SymbolTableList* next;
     int occupied;
-};
+} SymbolTableList;
+
 
 struct SymbolTable {
     // It's gonna be a hash table.
-    SymbolTableBucket* buckets;
+    struct SymbolTableList* begin;
+    struct SymbolTableList* end;
+
+    SymbolTableList* buckets;
     int bucketCount;
     int capacity;
 
@@ -183,6 +204,8 @@ struct SymbolTable {
     ~SymbolTable();
 
     static void populate(SymbolTable* self, const char* syms[], const TokenKind types[], const int symCount);
+    static void init(SymbolTable* self, int capacity);
+
     static SymbolTableBucket* insert(SymbolTable* self, const char* str);
     static b32 hasShallow(SymbolTable* self, const char* str, int* hash);
     static SymbolTableBucket* get(SymbolTable* self, const char* str);
@@ -217,16 +240,32 @@ typedef enum AST_types {
     AST_OP_DIV,
     AST_OP_MOD,
 
+    AST_OP_BW_XOR,
+    AST_OP_BW_OR,
+    AST_OP_BW_AND,
+
+    AST_OP_BW_SHL,
+    AST_OP_BW_SHR,
+
     AST_FUNCTION_RET_TYPE,
     AST_FUNCTION_IDENT,
     AST_FUNCTION_ARG,
     AST_FUNCTION_DECL,
     AST_FUNCTION_DEF,
+
+    AST_FUNCTION_CALL,
+
+    AST_IF_STMT,
     AST_BLOCK,
+
+
+    AST_VAR_DECL,
+    AST_VAR_DEF,
 
     AST_GLOBAL_DECL,
     AST_GLOBAL_DEF,
 
+    AST_ASSIGN,
     AST_RETURN_STMT,
 
     AST_EXPR,
@@ -311,8 +350,13 @@ public:
     static AST_Node* functionDeclaration(Parser* self, AST_Node* parent);
     static AST_Node* functionDefinition(Parser* self, AST_Node* parent);
 
+    static AST_Node* ifStmt(Parser* self, AST_Node* parent);
     static AST_Node* block(Parser* self, AST_Node* parent);
     static AST_Node* expr(Parser* self, AST_Node* parent);
+    static AST_Node* binaryOps(Parser* self, AST_Node* parent, int level);
+
+    static AST_Node* varDecl(Parser* self, AST_Node* parent);
+    static AST_Node* varDef(Parser* self, AST_Node* parent);
 
     static AST_Node* returnStmt(Parser* self, AST_Node* parent);
 
@@ -325,6 +369,8 @@ public:
     static AST_Node* globalDecl(Parser* self, AST_Node* parent);
     static AST_Node* globalDef(Parser* self, AST_Node* parent);
 
+    static AST_Node* assign(Parser* self, AST_Node* parent);
+    static AST_Node* functionCall(Parser* self, AST_Node* parent);
 
     static int name(Parser* self, AST_Node* parent);
 
@@ -339,6 +385,67 @@ public:
 };
 
 /*
+   Semantic analyzer - semval.
+*/
+
+typedef struct FunctionArgument {
+    // Type, name.
+    const char* type;
+    const char* name;
+    int typeLen;
+    int nameLen;
+} FunctionArgument;
+
+typedef struct VarSignature {
+    const char* type;
+    const char* name;
+    int typeLen;
+    int nameLen;
+
+    int nestCount;
+} VarSignature;
+
+
+
+typedef struct FunctionSignature {
+    const char* retType;
+    const char* name;
+    int retLen;
+    int nameLen;
+
+    std::vector<FunctionArgument> args;
+    FunctionSignature* next;
+} FunctionSignature;
+
+class Semantics {
+public:
+    // Usually the root node.
+    AST_Node* parent;
+
+    struct FunctionSignatureList {
+        FunctionSignature *begin, *end;
+    } functionDecl[128], functionDef[128];
+
+    Semantics();
+    ~Semantics();
+
+    static void init(Semantics* self, AST_Node* parent);
+    static void visitFunctions(Semantics* self, AST_Node* parent);
+
+    static int checkFnSignatures(Semantics* self);
+
+    static int validate(Semantics* self);
+
+    static int addToFunctionSignature(Semantics* self, FunctionSignatureList* arr, FunctionSignature fn);
+    static FunctionSignature* findFunctionSignature(Semantics* self, FunctionSignatureList* arr, FunctionSignature* src);
+    static FunctionSignature* findNextDuplicate(Semantics* self, FunctionSignatureList* arr,
+        FunctionSignature* src);
+
+private:
+    static constexpr int TABLE_CAPACITY = 32;
+};
+
+/*
    Compiler.
 */
 
@@ -347,15 +454,13 @@ public:
     const char* source;
     TokenScanner scanner;
     Parser parser;
+    Semantics semantics;
 
 
     SymbolTable keywords;
     SymbolTable symbols;
 
     SymbolTable globals;
-
-    FunctionDeclaration functionDeclarations[16];
-    int functionDeclCount;
 
     Compiler();
     ~Compiler();
@@ -364,6 +469,7 @@ public:
 
     static void doLex(Compiler* self);
     static void doParse(Compiler* self);
+    static void doValidation(Compiler* self);
 
     static void printInfo(Compiler* self);
 };

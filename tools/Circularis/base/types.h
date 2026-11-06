@@ -56,4 +56,38 @@ typedef uint32_t b32;
 #endif /* _FREE */
 
 
+#define SLL_APPEND_FRONT(f, l, n) ((f) == NULL ? \
+        (f) = (l) = (n) : \
+        ((n)->next = (f), (f) = (n)))
+
+#define SLL_APPEND_BACK(f, l, n) ((f) == NULL ? \
+        ((f) = (l) = (n)) : \
+        ((l)->next = (n), (l) = (n)), \
+        ((n)->next = NULL))
+
+#define SLL_POP_FRONT(f, l) ((f) == (l) ? \
+        ((f) = (l) = NULL) : \
+        ((f) = (f)->next)
+
+#define SLL_STACK_PUSH(f, n) ((n)->next = (f), (f) = (n))
+#define SLL_STACK_POP(f) ((f) == NULL ? NULL : ((f) = (f)->next))
+
+
+#define DLL_APPEND_BACK(f, l, n) ((f) == NULL ? \
+        ((f) = (l) = (n), (n)->next = (n)->prev = NULL) : \
+        ((n)->prev = (l), (l)->next = (n), (l) = (n), (n)->next = NULL))
+
+#define DLL_APPEND_FRONT(f, l, n) DLL_APPEND_BACK(l, f, n)
+
+#define DLL_REMOVE(f, l, n) ( \
+        (f) == (n) ? \
+            ((f) == (l) ? \
+                ((f) = (l) = (NULL)) : \
+                ((f) = (f)->next, (f)->prev = NULL)) : \
+            (l) == (n) ? \
+                ((l) = (l)->prev, (l)->next = NULL) : \
+                ((n)->next->prev = (n)->prev, \
+                (n)->prev->next = (n)->next))
+
+
 #endif /* CCL_TYPES_H_ */

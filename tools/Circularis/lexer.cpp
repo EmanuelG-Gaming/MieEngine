@@ -98,6 +98,7 @@ extern const char* TokenKindToStr(TokenKind kind)
         case TOKEN_KW_STRING: return "TOKEN_KW_STRING";
         case TOKEN_KW_RETURN: return "TOKEN_KW_RETURN";
         case TOKEN_KW_IF: return "TOKEN_KW_IF";
+        case TOKEN_KW_GLOBAL: return "TOKEN_KW_GLOBAL";
 
 
         case TOKEN_STR_LIT: return "TOKEN_STR_LIT";
@@ -125,9 +126,12 @@ extern const char* TokenKindToStr(TokenKind kind)
         case TOKEN_OP_LES: return "TOKEN_OP_LES";
         case TOKEN_OP_LEQ: return "TOKEN_OP_LEQ";
 
-        case TOKEN_BW_XOR: return "TOKEN_BW_XOR";
-        case TOKEN_BW_OR: return "TOKEN_BW_OR";
-        case TOKEN_BW_AND: return "TOKEN_BW_AND";
+        case TOKEN_OP_BW_XOR: return "TOKEN_OP_BW_XOR";
+        case TOKEN_OP_BW_OR: return "TOKEN_OP_BW_OR";
+        case TOKEN_OP_BW_AND: return "TOKEN_OP_BW_AND";
+        case TOKEN_OP_BW_SHL: return "TOKEN_OP_BW_SHL";
+        case TOKEN_OP_BW_SHR: return "TOKEN_OP_BW_SHR";
+
 
         default: return "TOKEN_UNKNOWN";
     }
@@ -152,8 +156,12 @@ TokenScanner::~TokenScanner()
 void TokenScanner::init(TokenScanner *self, const char *srcCode, int srcLen)
 {
     self->baseSource = srcCode;
-    self->cursor = srcCode;
     self->sourceLen = srcLen;
+    self->sourceEnd = self->baseSource + self->sourceLen;
+
+    self->cursor = srcCode;
+
+    self->sourceFileName = "<PLACEHOLDER>";
 
     // Init token.
     self->tokenCapacity = TOKEN_SCANNER_CAPACITY;
@@ -214,6 +222,8 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
         _MEMCPY(t.s, start, length);
         t.s[length] = '\0';
         t.sLen = length;
+        t.location.line = self->line;
+        t.location.column = self->column;
 
         // Skip closing quote.
         self->cursor++;
@@ -239,6 +249,9 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
                 t.type = TOKEN_CHR_LIT;
                 t.s[0] = '\0';
                 t.sLen = 1;
+                t.location.line = self->line;
+                t.location.column = self->column;
+
                 self->cursor++;
 
                 return t;
@@ -248,7 +261,11 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
         Token t;
         t.type = TOKEN_CHR_LIT;
         t.s[0] = *self->cursor;
+        t.s[1] = '\0';
         t.sLen = 1;
+
+        t.location.line = self->line;
+        t.location.column = self->column;
 
         self->cursor++;
 
@@ -276,6 +293,8 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
         _MEMCPY(t.s, start, length);
         t.s[length] = '\0';
         t.sLen = length;
+        t.location.line = self->line;
+        t.location.column = self->column;
 
         // Check if it's in a keyword table.
         SymbolTableBucket* bucket = gCompiler->keywords.get(&gCompiler->keywords, t.s);
@@ -294,29 +313,49 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
     }
 
     // Handle numbers.
-    if (IsDigit(*self->cursor))
+    // TODO: Negative numbers when
+    int floatCounter = 0;
+    if (IsDigit(*self->cursor) || *self->cursor == '.')
     {
         const char* start = self->cursor;
-        while (IsAlphaNumerical(*self->cursor))
+        if (*self->cursor == '-') self->cursor++;
+
+        while (IsAlphaNumerical(*self->cursor) || *self->cursor == '.')
         {
+            if (*self->cursor == '.') floatCounter++;
             self->cursor++;
         }
-        size_t length = self->cursor - start;
+        if (floatCounter > 1)
+        {
+            return CLITERAL(Token) { TOKEN_EOF, '\0', 0 };
+        }
+
+        // "Consume" a character.
+        const char* prevCursor = self->cursor;
+        if (*self->cursor == 'f')
+        {
+            if (floatCounter == 1) self->cursor++;
+            else return CLITERAL(Token) { TOKEN_EOF, '\0', 0 };
+        }
+
+        size_t length = prevCursor - start;
         if (length > TOKEN_STR_MAX)
         {
             length = TOKEN_STR_MAX;
         }
 
         Token t;
-        t.type = TOKEN_INT_LIT;
+        t.type = (floatCounter == 1) ? TOKEN_FLOAT_LIT : TOKEN_INT_LIT;
         _MEMCPY(t.s, start, length);
         t.s[length] = '\0';
         t.sLen = length;
+        t.location.line = self->line;
+        t.location.column = self->column;
 
         return t;
     }
 
-    // Handle operators.
+    // Handle operators/symbols.
     if (IsOperatorSymbol(*self->cursor))
     {
         const char* start = self->cursor;
@@ -335,6 +374,9 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
         _MEMCPY(t.s, start, length);
         t.s[length] = '\0';
         t.sLen = length;
+        t.location.line = self->line;
+        t.location.column = self->column;
+
 
         // Check if it's in a keyword table.
         SymbolTableBucket* bucket = gCompiler->symbols.get(&gCompiler->symbols, t.s);
@@ -356,20 +398,9 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
     // peeking.
     switch (*self->cursor)
     {
-        /*
-        case '+': self->cursor++; return CLITERAL(Token) { TOKEN_OP_ADD, '+', 1 };
-        case '-': self->cursor++; return CLITERAL(Token) { TOKEN_OP_SUB, '-', 1 };
-        case '*': self->cursor++; return CLITERAL(Token) { TOKEN_OP_MUL, '*', 1 };
-        case '/': self->cursor++; return CLITERAL(Token) { TOKEN_OP_DIV, '/', 1 };
-        case '%': self->cursor++; return CLITERAL(Token) { TOKEN_OP_MOD, '%', 1 };
-
-        case '=': self->cursor++; return CLITERAL(Token) { TOKEN_EQUAL, '=', 1 };
-        case '!': self->cursor++; return CLITERAL(Token) { TOKEN_OP_NOT, '!', 1 };
-        case '~': self->cursor++; return CLITERAL(Token) { TOKEN_OP_BW_NEG, '~', 1 };
-
-        case '>': self->cursor++; return CLITERAL(Token) { TOKEN_OP_GTR, '>', 1 };
-        case '<': self->cursor++; return CLITERAL(Token) { TOKEN_OP_LES, '<', 1 };
-        */
+        case '|': self->cursor++; return CLITERAL(Token) { TOKEN_OP_BW_OR, '|', 1 };
+        case '&': self->cursor++; return CLITERAL(Token) { TOKEN_OP_BW_AND, '&', 1 };
+        case '^': self->cursor++; return CLITERAL(Token) { TOKEN_OP_BW_XOR, '^', 1 };
 
         case '(': self->cursor++; return CLITERAL(Token) { TOKEN_LPAREN, '(', 1 };
         case ')': self->cursor++; return CLITERAL(Token) { TOKEN_RPAREN, ')', 1 };
@@ -392,15 +423,18 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
 
 void TokenScanner::getTokens(TokenScanner *self)
 {
-    Token* nextToken = NULL;
+    Token* prevToken = NULL;
     Token token;
 
     do {
         token = self->retrieveNextToken(self);
         Token* tokenPtr = self->pushToken(self, token);
 
-        tokenPtr->next = nextToken;
-        nextToken = tokenPtr;
+        if (prevToken != NULL)
+        {
+            prevToken->next = tokenPtr;
+        };
+        prevToken = tokenPtr;
     } while (token.type != TOKEN_EOF);
 }
 
@@ -443,12 +477,17 @@ Token* TokenScanner::pushToken(TokenScanner *self, Token token)
 
 void TokenScanner::backtrack(TokenScanner *self, int by)
 {
-    self->cursor -= by;
+    const char* ptr = self->cursor - by;
+
+    if (ptr >= self->baseSource)
+    {
+        self->cursor = ptr;
+    } else self->cursor = self->baseSource;
 }
 
 const char* TokenScanner::peek(TokenScanner *self, int offset)
 {
-    if ((self->cursor + offset) - self->baseSource > self->sourceLen)
+    if (self->cursor + offset >= self->sourceEnd)
     {
         return "\0";
     }

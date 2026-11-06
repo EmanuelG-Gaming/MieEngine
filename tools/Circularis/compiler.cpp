@@ -17,6 +17,7 @@ static const char* symbolKeywords[] = {
     "string",
     "return",
     "if",
+    "global",
 };
 static TokenKind keywordKinds[] = {
     TOKEN_KW_VOID,
@@ -25,14 +26,17 @@ static TokenKind keywordKinds[] = {
     TOKEN_KW_STRING,
     TOKEN_KW_RETURN,
     TOKEN_KW_IF,
+    TOKEN_KW_GLOBAL,
 };
-#define SYMBOL_KEYWORD_COUNT 6
+#define SYMBOL_KEYWORD_COUNT 7
 
 
 static const char* operatorSymbols[] = {
     "==", ">=", "<=", "!=",
+
     "+", "-", "*", "/", "%",
     "=", "!", "~", ">", "<",
+    "^", "|", "&", "<<", ">>",
     "(", ")", "{", "}", "[", "]",
     ",", ";",
 };
@@ -51,6 +55,12 @@ static TokenKind operatorKinds[] = {
     TOKEN_OP_GTR,
     TOKEN_OP_LES,
 
+    TOKEN_OP_BW_XOR,
+    TOKEN_OP_BW_OR,
+    TOKEN_OP_BW_AND,
+    TOKEN_OP_BW_SHL,
+    TOKEN_OP_BW_SHR,
+
     TOKEN_LPAREN, TOKEN_RPAREN,
     TOKEN_LBRACE, TOKEN_RBRACE,
     TOKEN_LBRACKET, TOKEN_RBRACKET,
@@ -59,8 +69,7 @@ static TokenKind operatorKinds[] = {
     TOKEN_SEMICOLON,
 };
 #define OPERATOR_SYMBOL_COUNT STATIC_ARR_LEN(operatorKinds)
-
-
+static_assert(OPERATOR_SYMBOL_COUNT == STATIC_ARR_LEN(operatorSymbols), "r");
 
 SymbolTable::SymbolTable()
 {
@@ -71,11 +80,14 @@ SymbolTable::~SymbolTable()
 {
     if (buckets != NULL)
     {
-        // Iterate over the buckets first.
-        for (int i = 0; i < capacity; ++i)
+        for (int i = 0; i < bucketCount; ++i)
         {
-            SymbolTableBucket* bucket = &buckets[i];
-            for (SymbolTableBucket* ptr = bucket->next; ptr != NULL; ptr = ptr->next)
+            SymbolTableList* lst = &buckets[i];
+            if (!lst->occupied)
+            {
+                continue;
+            }
+            for (SymbolTableBucket* ptr = lst->begin; ptr != lst->end; ptr = ptr->next)
             {
                 _FREE(ptr);
             }
@@ -92,9 +104,10 @@ void SymbolTable::populate(SymbolTable *self,
 {
     assert(!self->initialized);
 
-    self->capacity = ((symCount + SYMBOL_TABLE_ALIGN) & ~(SYMBOL_TABLE_ALIGN - 1));
-    size_t bytecount = sizeof(SymbolTableBucket) * self->capacity;
-    self->buckets = (SymbolTableBucket *) _MALLOC(bytecount);
+    self->capacity = (((symCount) + SYMBOL_TABLE_ALIGN) & ~(SYMBOL_TABLE_ALIGN - 1));
+    size_t bytecount = sizeof(SymbolTableList) * self->capacity;
+    self->buckets = (SymbolTableList *) _MALLOC(bytecount);
+    assert(self->buckets != NULL);
     _MEMSET(self->buckets, 0, bytecount);
 
     for (int i = 0; i < symCount; ++i)
@@ -109,15 +122,33 @@ void SymbolTable::populate(SymbolTable *self,
     self->initialized = TRUE;
 }
 
+void SymbolTable::init(SymbolTable *self, int capacity)
+{
+    assert(!self->initialized);
+
+    self->capacity = (((capacity) + SYMBOL_TABLE_ALIGN) & ~(SYMBOL_TABLE_ALIGN - 1));
+    size_t bytecount = sizeof(SymbolTableList) * self->capacity;
+    self->buckets = (SymbolTableList *) _MALLOC(bytecount);
+    assert(self->buckets != NULL);
+    _MEMSET(self->buckets, 0, bytecount);
+
+    self->initialized = TRUE;
+}
+
+//fprintf(stderr, "Symbol [%s] with first char: %d hash %d\n", str, str[0], hash);
 
 SymbolTableBucket* SymbolTable::insert(SymbolTable *self, const char *str)
 {
     int len = CstrLen(str);
     int hash = CalcPseudoHashBounded(str, len, self->capacity);
 
-    SymbolTableBucket* bucket = &self->buckets[hash];
-    if (bucket->occupied == FALSE)
+    SymbolTableList* lst = &self->buckets[hash];
+    if (lst->occupied == FALSE)
     {
+        // Add first element.
+        SymbolTableBucket* bucket = (SymbolTableBucket *) _MALLOC(sizeof(SymbolTableBucket));
+        assert(bucket != NULL);
+
         // Insert symbol.
         if (len > SYMBOL_STR_MAX)
         {
@@ -126,9 +157,26 @@ SymbolTableBucket* SymbolTable::insert(SymbolTable *self, const char *str)
         _MEMCPY(bucket->symbol.val, str, len);
         bucket->symbol.val[len] = '\0';
         bucket->symbol.len = len;
+        bucket->next = NULL;
 
-        bucket->occupied = TRUE;
+        lst->occupied = TRUE;
         self->bucketCount++;
+
+        if (self->begin == NULL)
+        {
+            self->begin = lst;
+            self->end = lst;
+        }
+        else
+        {
+            self->end->next = lst;
+            self->end = lst;
+            lst->next = NULL;
+        }
+
+        // Chain this list.
+        lst->begin = bucket;
+        lst->end = bucket;
 
         return bucket;
     }
@@ -142,13 +190,15 @@ SymbolTableBucket* SymbolTable::insert(SymbolTable *self, const char *str)
         {
             len = SYMBOL_STR_MAX;
         }
-
         _MEMCPY(newBucket->symbol.val, str, len);
         newBucket->symbol.val[len] = '\0';
         newBucket->symbol.len = len;
-        newBucket->occupied = TRUE;
 
-        bucket->next = newBucket;
+        self->bucketCount++;
+
+        // Chain this to the linked list.
+        lst->end->next = newBucket;
+        lst->end = newBucket;
         newBucket->next = NULL;
 
         return newBucket;
@@ -171,8 +221,8 @@ SymbolTableBucket* SymbolTable::get(SymbolTable *self, const char *str)
     int len = CstrLen(str);
     int h = CalcPseudoHashBounded(str, len, self->capacity);
 
-    SymbolTableBucket* bucket = &self->buckets[h];
-    for (SymbolTableBucket* ptr = bucket; ptr != NULL; ptr = ptr->next)
+    SymbolTableList* lst = &self->buckets[h];
+    for (SymbolTableBucket* ptr = lst->begin; ptr != NULL; ptr = ptr->next)
     {
         if (ptr->symbol.len == len &&
             (memcmp(ptr->symbol.val, str, ptr->symbol.len) == 0))
@@ -220,11 +270,12 @@ void SymbolTable::print(SymbolTable* self)
 {
     for (int i = 0; i < self->capacity; ++i)
     {
-        SymbolTableBucket* bucket = &self->buckets[i];
+        fprintf(stderr, "%d: ", i);
+        SymbolTableList* lst = &self->buckets[i];
         // Iterate over bucket elements.
-        if (bucket->occupied)
+        if (lst->occupied)
         {
-            for (SymbolTableBucket* ptr = bucket; ptr != NULL; ptr = ptr->next)
+            for (SymbolTableBucket* ptr = lst->begin; ptr != NULL; ptr = ptr->next)
             {
                 const char* kindName = TokenKindToStr(static_cast<TokenKind>(ptr->symbol.tokenType));
                 fprintf(stderr, "[%s] -> [%.*s]  ", kindName, ptr->symbol.len, ptr->symbol.val);
@@ -265,6 +316,7 @@ void Compiler::init(Compiler *self, const char *sourceCode)
 
     self->scanner.init(&self->scanner, sourceCode, CstrLen(sourceCode));
     self->parser.init(&self->parser, self->scanner.tokens);
+    //self->semantics.init(&self->semantics, self->parser.root);
 }
 
 void Compiler::doLex(Compiler *self)
@@ -274,19 +326,25 @@ void Compiler::doLex(Compiler *self)
 
 void Compiler::doParse(Compiler* self)
 {
-    self->scanner.print(&self->scanner);
+    //self->scanner.print(&self->scanner);
     self->parser.parseStart(&self->parser);
+}
+
+void Compiler::doValidation(Compiler* self)
+{
+    self->semantics.validate(&self->semantics);
 }
 
 void Compiler::printInfo(Compiler *self)
 {
     // Compiler frontend pipeline.
+    /*
     fprintf(stderr, "KEYWORD TABLE:\n");
     self->keywords.print(&self->keywords);
 
     fprintf(stderr, "SYMBOL TABLE:\n");
     self->symbols.print(&self->symbols);
-
+    */
 
     fprintf(stderr, "FOR PROGRAM:\n");
     fprintf(stderr, "%s\n", self->source);
@@ -297,5 +355,5 @@ void Compiler::printInfo(Compiler *self)
 
     fprintf(stderr, "========================\n");
     fprintf(stderr, "\nPARSER OUTPUT:\n");
-    //self->parser.root->print(self->parser.root, 0);
+    self->parser.root->print(self->parser.root, 0, "");
 }
