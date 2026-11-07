@@ -346,14 +346,17 @@ AST_Node* Parser::globalDef(Parser *self, AST_Node *parent)
 
     if (!consume(self, "="))
     {
-        PrintError("Syntax error: Expected '='.\n");
+        // TODO: Return an error index, maybe.
+        // And only report the error if it's a syntactic one.
+
+        //PrintError("Syntax error: Expected '='.\n");
         return NULL;
     }
 
     AST_Node* c = expr(self, node);
     if (c == NULL)
     {
-        PrintError("Syntax error: Expected expression.\n");
+        //PrintError("Syntax error: Expected expression.\n");
         return NULL;
     }
     node->C = c;
@@ -361,7 +364,7 @@ AST_Node* Parser::globalDef(Parser *self, AST_Node *parent)
 
     if (!consumeOptional(self, ";"))
     {
-        PrintError("Syntax error: Expected semicolon ;\n");
+        //PrintError("Syntax error: Expected semicolon ;\n");
         return NULL;
     }
 
@@ -539,19 +542,19 @@ AST_Node* Parser::returnStmt(Parser *self, AST_Node *parent)
         return NULL;
     }
 
-    AST_Node* a = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
-    assert(a != NULL);
-    a->type = AST_RETURN_STMT;
-    a->parent = parent;
+    AST_Node* node = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
+    assert(node != NULL);
+    node->type = AST_RETURN_STMT;
+    node->parent = parent;
 
-    AST_Node* e = expr(self, a);
-    if (e == NULL)
+    AST_Node* a = expr(self, node);
+    if (a == NULL)
     {
         PrintError("Syntax error: expected expression: %*s\n", TOKEN_FMT(self->cursor));
         return NULL;
     }
-    a->A = e;
-    a->A->parent = a;
+    node->A = a;
+    node->A->parent = node;
 
     if (!consume(self, ";"))
     {
@@ -559,7 +562,7 @@ AST_Node* Parser::returnStmt(Parser *self, AST_Node *parent)
         return NULL;
     }
 
-    return a;
+    return node;
 }
 
 // Either an INT, a FLOAT or an IDENT.
@@ -576,6 +579,8 @@ AST_Node* Parser::factor(Parser *self, AST_Node *parent)
             return NULL;
         }
         node->parent = parent;
+
+        fprintf(stderr, "TOKEN AFTER CALL: %.*s\n", TOKEN_FMT(self->cursor));
 
         return node;
     }
@@ -629,50 +634,6 @@ AST_Node* Parser::factor(Parser *self, AST_Node *parent)
 
     PrintError("Syntax error: Expected a number (INT or FLOAT) or an identifier.\n");
     return NULL;
-}
-
-// Multiplication and division. (*, /)
-AST_Node* Parser::term(Parser *self, AST_Node *parent)
-{
-    // Obtain the first factor.
-    AST_Node* left = factor(self, parent);
-    if (left == NULL)
-    {
-        PrintError("Syntax error: Expected a factor for the LHS.\n");
-        return NULL;
-    }
-
-    // As long as the next token is * or /, create an operation node.
-    while (peek(self, "*", 0) || peek(self, "/", 0))
-    {
-        Token* opToken = self->cursor;
-        consumeGo(self); // self->token.
-
-        //Token* opToken = self->cursor;
-
-        AST_Node* opNode = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
-        switch (opToken->type)
-        {
-            case TOKEN_OP_MUL: opNode->type = AST_OP_MUL; break;
-            case TOKEN_OP_DIV: opNode->type = AST_OP_DIV; break;
-            default: opNode->type = AST_NONE;
-        }
-        opNode->parent = parent;
-
-        opNode->A = left;
-        left->parent = opNode;
-
-        AST_Node* right = factor(self, opNode);
-        if (right == NULL)
-        {
-            PrintError("Syntax error: Expected a factor for the RHS.\n");
-            return NULL;
-        }
-        opNode->B = right;
-        left = opNode;
-    }
-
-    return left;
 }
 
 
@@ -894,9 +855,7 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
     node->parent = parent;
 
     AST_Node* currentChild = NULL;
-
-    int hasClosing = peek(self, "}", 0);
-    while (!hasClosing)
+    while (!peek(self, "}", 0))
     {
         currentChild = NULL;
         Token* prevToken = self->cursor;
@@ -904,7 +863,6 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
         if (peek(self, "return", 0))
         {
             // Return statements.
-            fprintf(stderr, "IT IS A RETURN STATEMENT!\n");
             self->cursor = prevToken;
             currentChild = returnStmt(self, node);
         }
@@ -913,11 +871,20 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
             self->cursor = prevToken;
             currentChild = ifStmt(self, node);
         }
+
         if (currentChild == NULL)
         {
             // Function calls.
             self->cursor = prevToken;
             currentChild = functionCall(self, node);
+            if (currentChild != NULL)
+            {
+                if (!consumeOptional(self, ";"))
+                {
+                    PrintError("Syntax error: Expected semicolon at the end of function call!\n");
+                    return NULL;
+                }
+            }
         }
 
 
@@ -941,6 +908,8 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
             currentChild = assign(self, node);
         }
 
+
+
         if (currentChild == NULL)
         {
             PrintError("Syntax error: Couldn't parse things in function block!\n");
@@ -955,10 +924,8 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
         }
         node->nodes[node->nodeCount] = currentChild;
         node->nodeCount++;
-
-        hasClosing = peek(self, "}", 0);
     }
-    if (!hasClosing)
+    if (!peek(self, "}", 0))
     {
         PrintError("Syntax error: Couldn't parse function block. Expected closing curly brace.\n");
         goto err;
@@ -1003,6 +970,7 @@ AST_Node* Parser::ifStmt(Parser *self, AST_Node *parent)
         return NULL;
     }
 
+    // Comment this for R*st syntax.
     /*
     if (!consume(self, "("))
     {
@@ -1054,7 +1022,7 @@ AST_Node* Parser::functionCall(Parser* self, AST_Node* parent)
 {
     // h moment.
     int hasType = 0;
-    if (peek(self, "int", 0)) {
+    if(peek(self, "int", 0)) {
         hasType = 1;
     } else if (peek(self, "float", 0)) {
         hasType = 1;
@@ -1068,7 +1036,7 @@ AST_Node* Parser::functionCall(Parser* self, AST_Node* parent)
 
     if (hasType)
     {
-        PrintError("Syntax error: Cannot have a function call named after a type!\n");
+        PrintError("Syntax error: Cannot have a function call named after a type! %.*s\n", TOKEN_FMT(self->cursor));
         return NULL;
     }
 
@@ -1091,7 +1059,7 @@ AST_Node* Parser::functionCall(Parser* self, AST_Node* parent)
     node->A = a;
     node->A->parent = node;
 
-    consumeGo(self);
+    //consumeGo(self);
     consume(self, "(");
 
     //fprintf(stderr, "Current token !!! : %.*s\n", TOKEN_FMT(self->cursor));
@@ -1119,15 +1087,18 @@ AST_Node* Parser::functionCall(Parser* self, AST_Node* parent)
         consumeOptional(self, ",");
     }
 
-    if (!consumeOptional(self, ")"))
+    if (!consume(self, ")"))
     {
         return NULL;
     }
+    /*
     if (!consumeOptional(self, ";"))
     {
         PrintError("Syntax error: Expected semicolon at the end of function call!\n");
         return NULL;
     }
+    */
+    //consumeOptional(self, ";");
 
     return node;
 }
@@ -1238,8 +1209,6 @@ AST_Node* Parser::functionDeclaration(Parser *self, AST_Node* parent)
     while (!hasClosing)
     {
         // Parse function arguments.
-        //PrintError("token: %*s\n", TOKEN_FMT(self->cursor));
-
         currentArg = functionArg(self, master);
         if (currentArg == NULL)
         {
@@ -1338,11 +1307,6 @@ AST_Node* Parser::functionDefinition(Parser *self, AST_Node* parent)
 
     if (!consume(self, "("))
     {
-        /*
-        _FREE(master);
-        _FREE(a);
-        _FREE(b);
-        */
         return NULL;
     }
 
@@ -1354,8 +1318,6 @@ AST_Node* Parser::functionDefinition(Parser *self, AST_Node* parent)
     while (!hasClosing)
     {
         // Parse function arguments.
-        PrintError("token: %*s\n", TOKEN_FMT(self->cursor));
-
         currentArg = functionArg(self, master);
         if (currentArg == NULL)
         {
@@ -1546,8 +1508,10 @@ int Parser::consume(Parser *self, const char *str)
         self->cursor = self->cursor + 1;
         return TRUE;
     }
+    /*
     PrintError("Syntax error: expected %s got %.*s\n",
         str, (int) self->cursor->sLen, (const char *) self->cursor->s);
+    */
 
     /*
     PrintError("Syntax error: expected %s got %.*s\n",

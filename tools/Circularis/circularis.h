@@ -361,7 +361,6 @@ public:
     static AST_Node* returnStmt(Parser* self, AST_Node* parent);
 
     static AST_Node* factor(Parser* self, AST_Node* parent);
-    static AST_Node* term(Parser* self, AST_Node* parent);
 
     static AST_Node* type(Parser* self, AST_Node* parent, b32 isFunction);
     static AST_Node* functionArg(Parser* self, AST_Node* parent);

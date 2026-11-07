@@ -11,22 +11,15 @@ Compiler* gCompiler = NULL;
 const char* sourceCode = MULTILINE_STR(
     int as(int x, float y)
     {
-        return x + 4;
+        return callSomething(x, x + y % 5);
     }
 
-    void main() {
-        as(5 + 2, 5+1-35);
-    }
-);
-
-/*
-const char* sourceCode = MULTILINE_STR(
-    void main()
+    int main()
     {
+        int g = as(5, -4.0f);
+        return g;
     }
 );
-*/
-
 
 int CompilerTest(void)
 {

@@ -313,9 +313,10 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
     }
 
     // Handle numbers.
-    // TODO: Negative numbers when
     int floatCounter = 0;
-    if (IsDigit(*self->cursor) || *self->cursor == '.')
+    b32 negative = FALSE;
+    if (*self->cursor == '-') negative = TRUE;
+    if (IsDigit(*(self->cursor + negative)) || *(self->cursor + negative) == '.')
     {
         const char* start = self->cursor;
         if (*self->cursor == '-') self->cursor++;

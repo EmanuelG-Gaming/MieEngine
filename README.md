@@ -60,6 +60,10 @@ cl src/main.cpp /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\
 cl src/main.cpp /ZI /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared" /I "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt" /DRIVER:none /link /NODEFAULTLIB kernel32.lib libcmt.lib user32.lib gdi32.lib d3d9.lib d3dcompiler.lib dxgi.lib /ENTRY:customMain /OUT:app.exe
 ```
 
+```
+cl src/main.cpp /ZI /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared" /I "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\include" /I "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt" /link kernel32.lib libcmt.lib user32.lib gdi32.lib d3d9.lib d3dcompiler.lib dxgi.lib /SUBSYSTEM:CONSOLE /OUT:app.exe
+```
+
 And then you can run the application by simply doing `app.exe`.
 
 
