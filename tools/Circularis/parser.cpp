@@ -109,7 +109,7 @@ void AST_Node::print(AST_Node *self, int level, const char* label, ...)
     }
     if (self->B != NULL)
     {
-        self->B->print(self->B, level+1, "B ");
+    self->B->print(self->B, level+1, "B ");
     }
     if (self->C != NULL)
     {
@@ -158,6 +158,9 @@ extern const char* AstTypeToString(AST_types type)
 
         case AST_FUNCTION_CALL: return "AST_FUNCTION_CALL";
 
+        case AST_ELSE: return "AST_ELSE";
+        case AST_FOR_LOOP: return "AST_FOR_LOOP";
+        case AST_WHILE_LOOP: return "AST_WHILE_LOOP";
         case AST_BLOCK: return "AST_BLOCK";
 
         case AST_FACTOR: return "AST_FACTOR";
@@ -238,7 +241,7 @@ AST_Node* Parser::type(Parser* self, AST_Node *parent, b32 isFunction)
 
     if (!hasType)
     {
-        PrintError("Syntax error: type is not valid!\n");
+    PrintError("Syntax error: type is not valid!\n");
         return NULL;
     }
 
@@ -421,7 +424,7 @@ AST_Node* Parser::varDef(Parser *self, AST_Node *parent)
 {
     if (consumeOptional(self, "global"))
     {
-        PrintError("Syntax error: Cannot use types or 'global' in a local variable definition!");
+        PrintError("Syntax error: Cannot use types or 'global' in a local variable definition!\n");
         return NULL;
     }
 
@@ -489,7 +492,7 @@ AST_Node* Parser::assign(Parser *self, AST_Node *parent)
         peek(self, "fn", 0) || peek(self, "void", 0) ||
         peek(self, "global", 0))
     {
-        PrintError("Cannot assign a value to a type!\n");
+        PrintError("Syntax error: Cannot assign a value to a type!\n");
         return NULL;
     }
 
@@ -511,25 +514,74 @@ AST_Node* Parser::assign(Parser *self, AST_Node *parent)
     node->A = a;
     node->A->parent = node->A;
 
-    Token* currentToken = self->cursor;
+    Token* operatorToken = NULL;
     // Parse the first symbol.
     if (!consumeOptional(self, "="))
     {
         // If the first symbol is not an equals sign,
         // then it must be a compound assignment +=, -=, *=, /=, %=.
+        operatorToken = self->cursor;
         consumeGo(self);
     }
 
-    AST_Node* b = expr(self, node);
-    if (b == NULL)
+    if (operatorToken != NULL)
+    {
+        AST_types opType = AST_NONE;
+        switch (operatorToken->type)
+        {
+            case TOKEN_OP_ADD: opType = AST_OP_ADD; break;
+            case TOKEN_OP_SUB: opType = AST_OP_SUB; break;
+            case TOKEN_OP_MUL: opType = AST_OP_MUL; break;
+            case TOKEN_OP_DIV: opType = AST_OP_DIV; break;
+            case TOKEN_OP_MOD: opType = AST_OP_MOD; break;
+
+            case TOKEN_OP_BW_XOR: opType = AST_OP_BW_XOR; break;
+            case TOKEN_OP_BW_OR: opType = AST_OP_BW_OR; break;
+            case TOKEN_OP_BW_AND: opType = AST_OP_BW_AND; break;
+
+            case TOKEN_OP_BW_SHL: opType = AST_OP_BW_SHL; break;
+            case TOKEN_OP_BW_SHR: opType = AST_OP_BW_SHR; break;
+            default: break;
+        }
+        if (opType == AST_NONE)
+        {
+            PrintError("Syntax error: Expected a valid operator in assignment!\n");
+            return NULL;
+        }
+
+        AST_Node* b = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
+        assert(b != NULL);
+        b->type = opType;
+        b->parent = node;
+        b->value.type = AST_STRING;
+        b->value.str = operatorToken->s;
+        b->value.sLen = operatorToken->sLen;
+
+        node->B = b;
+        node->B->parent = node;
+
+        consumeGo(self);
+    }
+
+    /*
+    if (!consumeOptional(self, "="))
+    {
+        return NULL;
+    }
+    */
+
+    PrintError("Something: %.*s\n", TOKEN_FMT(self->cursor));
+
+    AST_Node* c = expr(self, node);
+    if (c == NULL)
     {
         PrintError("Syntax error: Expected expression.\n");
         return NULL;
     }
-    node->B = b;
-    node->B->parent = node->B;
+    node->C = c;
+    node->C->parent = node->C;
 
-    return b;
+    return node;
 }
 
 // Grammar rule:
@@ -571,7 +623,6 @@ AST_Node* Parser::factor(Parser *self, AST_Node *parent)
     // It is a function call.
     if (peekType(self, TOKEN_IDENT, 0) && peek(self, "(", 1))
     {
-        fprintf(stderr, "IT IS A FUNCTION CALL! TOKEN: %.*s\n", TOKEN_FMT(self->cursor));
         AST_Node* node = functionCall(self, parent);
         if (node == NULL)
         {
@@ -579,8 +630,6 @@ AST_Node* Parser::factor(Parser *self, AST_Node *parent)
             return NULL;
         }
         node->parent = parent;
-
-        fprintf(stderr, "TOKEN AFTER CALL: %.*s\n", TOKEN_FMT(self->cursor));
 
         return node;
     }
@@ -594,8 +643,6 @@ AST_Node* Parser::factor(Parser *self, AST_Node *parent)
         node->value.type = AST_INT;
         node->value.i = atoi(self->cursor->s);
         consumeGo(self);
-
-        fprintf(stderr, "PARSING INT! %d\n", node->value.i);
 
         return node;
     }
@@ -877,6 +924,9 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
             // Function calls.
             self->cursor = prevToken;
             currentChild = functionCall(self, node);
+
+            // Function calls don't expect a semicolon by default,
+            // so add that in.
             if (currentChild != NULL)
             {
                 if (!consumeOptional(self, ";"))
@@ -887,27 +937,38 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
             }
         }
 
+        if (currentChild == NULL)
+        {
+            self->cursor = prevToken;
+            if (peek(self, "=", 1))
+            {
+                // Variable assignments.
+                currentChild = assign(self, node);
+                if (currentChild != NULL)
+                {
+                    if (!consumeOptional(self, ";"))
+                    {
+                        PrintError("Syntax error: Expected semicolon at the end of variable assignment!\n");
+                        return NULL;
+                    }
+                }
+            }
+        }
 
-        // TODO: Fix priority in grammar rules.
+
         if (currentChild == NULL)
         {
             // Variable declarations.
             self->cursor = prevToken;
             currentChild = varDecl(self, node);
         }
+
         if (currentChild == NULL)
         {
             // Variable definitions.
             self->cursor = prevToken;
             currentChild = varDef(self, node);
         }
-        if (currentChild == NULL)
-        {
-            // Variable assignments.
-            self->cursor = prevToken;
-            currentChild = assign(self, node);
-        }
-
 
 
         if (currentChild == NULL)
@@ -962,6 +1023,7 @@ err:
 
 // Grammar rule:
 // ifStmt -> "if" "(" expr ")" block
+// optional: else.
 AST_Node* Parser::ifStmt(Parser *self, AST_Node *parent)
 {
     if (!consume(self, "if"))
@@ -1001,7 +1063,6 @@ AST_Node* Parser::ifStmt(Parser *self, AST_Node *parent)
     }
     */
 
-
     AST_Node* b = block(self, node);
     if (b == NULL)
     {
@@ -1011,10 +1072,84 @@ AST_Node* Parser::ifStmt(Parser *self, AST_Node *parent)
     node->B = b;
     node->B->parent = node;
 
+    if (peek(self, "else", 0))
+    {
+        // Two options: else {}
+        // or else if ()...
+        consumeGo(self);
+
+        if (peek(self, "if", 0))
+        {
+            // Put this in a list.
+            // If statement is added to the pointer C of the source node
+            // as a recursive chain of "else if".
+            AST_Node* n = ifStmt(self, node);
+            if (n == NULL)
+            {
+                return NULL;
+            }
+            node->C = n;
+            node->C->parent = node;
+        }
+        else if (peek(self, "{", 0))
+        {
+            // Parse block.
+            // Else statement is added to source node as the ending pointer D.
+            AST_Node* elseStmt = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
+            assert(elseStmt != NULL);
+            elseStmt->type = AST_ELSE;
+            elseStmt->parent = node;
+
+            AST_Node* n = block(self, node);
+            if (n == NULL)
+            {
+                return NULL;
+            }
+            elseStmt->A = n;
+            elseStmt->A->parent = elseStmt;
+
+            node->D = elseStmt;
+            node->D->parent = node;
+        }
+        else
+        {
+            // Do nothing for this. We expect the next statement.
+        }
+    }
+
 
     return node;
 }
 
+// Grammar rule:
+// forLoop -> "for" ("(")* (varDef|varAssign) ";" expr ";" expr ("{")* block  ("}")*
+AST_Node* Parser::forLoop(Parser* self, AST_Node* parent)
+{
+    if (!consume(self, "for"))
+    {
+        // Syntax error: Expected keyword "for" in for loop.
+        return NULL;
+    }
+
+    AST_Node* node = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
+    assert(node != NULL);
+    node->type = AST_FOR_LOOP;
+    node->parent = parent;
+
+    AST_Node* a = expr(self, node);
+    if (a == NULL)
+    {
+        // Syntax error: Expected variable initialization.
+        return NULL;
+    }
+
+
+    return node;
+}
+AST_Node* Parser::whileLoop(Parser* self, AST_Node* parent)
+{
+    return NULL;
+}
 
 // Grammar rule:
 // functionCall -> IDENT "(" ((expr|functionCall) ",")* ")" ";"

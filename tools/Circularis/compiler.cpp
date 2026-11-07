@@ -17,6 +17,9 @@ static const char* symbolKeywords[] = {
     "string",
     "return",
     "if",
+    "else",
+    "for",
+    "while",
     "global",
 };
 static TokenKind keywordKinds[] = {
@@ -26,9 +29,13 @@ static TokenKind keywordKinds[] = {
     TOKEN_KW_STRING,
     TOKEN_KW_RETURN,
     TOKEN_KW_IF,
+    TOKEN_KW_ELSE,
+    TOKEN_KW_FOR,
+    TOKEN_KW_WHILE,
     TOKEN_KW_GLOBAL,
 };
-#define SYMBOL_KEYWORD_COUNT 7
+#define SYMBOL_KEYWORD_COUNT STATIC_ARR_LEN(keywordKinds)
+
 
 
 static const char* operatorSymbols[] = {
@@ -306,15 +313,17 @@ Compiler::~Compiler()
 }
 
 
-void Compiler::init(Compiler *self, const char *sourceCode)
+void Compiler::init(Compiler *self, const char *sourceCode, size_t sourceLen)
 {
     self->source = sourceCode;
+    self->sourceEnd = sourceCode + sourceLen;
+    self->sourceLen = sourceLen;
 
     // Populate symbol tables.
     self->keywords.populate(&self->keywords, symbolKeywords, keywordKinds, SYMBOL_KEYWORD_COUNT);
     self->symbols.populate(&self->symbols, operatorSymbols, operatorKinds, OPERATOR_SYMBOL_COUNT);
 
-    self->scanner.init(&self->scanner, sourceCode, CstrLen(sourceCode));
+    self->scanner.init(&self->scanner, sourceCode, sourceLen);
     self->parser.init(&self->parser, self->scanner.tokens);
     //self->semantics.init(&self->semantics, self->parser.root);
 }
@@ -347,7 +356,7 @@ void Compiler::printInfo(Compiler *self)
     */
 
     fprintf(stderr, "FOR PROGRAM:\n");
-    fprintf(stderr, "%s\n", self->source);
+    fprintf(stderr, "%.*s\n", (int) self->sourceLen, self->source);
 
     fprintf(stderr, "========================\n");
     fprintf(stderr, "\nLEXER OUTPUT:\n");

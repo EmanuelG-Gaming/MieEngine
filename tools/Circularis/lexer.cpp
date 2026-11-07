@@ -97,7 +97,12 @@ extern const char* TokenKindToStr(TokenKind kind)
         case TOKEN_KW_FLOAT: return "TOKEN_KW_FLOAT";
         case TOKEN_KW_STRING: return "TOKEN_KW_STRING";
         case TOKEN_KW_RETURN: return "TOKEN_KW_RETURN";
+
         case TOKEN_KW_IF: return "TOKEN_KW_IF";
+        case TOKEN_KW_ELSE: return "TOKEN_KW_ELSE";
+        case TOKEN_KW_FOR: return "TOKEN_KW_FOR";
+        case TOKEN_KW_WHILE: return "TOKEN_KW_WHILE";
+
         case TOKEN_KW_GLOBAL: return "TOKEN_KW_GLOBAL";
 
 
@@ -177,16 +182,56 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
 {
     while (1)
     {
-        if (*self->cursor == '\0')
+        if (peek(self, 0) == '\0')
         {
             return CLITERAL(Token) { TOKEN_EOF, '\0', 0 };
         }
 
+        // Comments.
+        if (peek(self, 0) == '/')
+        {
+            if (peek(self, 1) == '/')
+            {
+                // Read single-line comment.
+                while (peek(self, 0) != '\n' && peek(self, 0) != '\0')
+                {
+                    self->cursor++;
+                }
+
+                if (peek(self, 0) == '\n')
+                {
+                    self->line++;
+                    self->column = 0;
+                    self->cursor++;
+                }
+            } else if (peek(self, 1) == '*')
+            {
+                // Read multi-line comment.
+                self->cursor += 2;
+                while (!(peek(self, 0) == '*' && peek(self, 1) == '/') && peek(self, 0) != '\0')
+                {
+                    if (peek(self, 0) == '\n')
+                    {
+                        self->line++;
+                        self->column = 0;
+                    }
+                    self->cursor++;
+                }
+
+                if (peek(self, 0) == '*' && peek(self, 1) == '/')
+                {
+                    self->cursor += 2;
+                }
+            }
+
+            continue;
+        }
+
         // Spaces.
-        if (IsSpace(*self->cursor))
+        if (IsSpace(peek(self, 0)))
         {
             // We encounter a line.
-            if (*self->cursor == '\n')
+            if (peek(self, 0) == '\n')
             {
                 self->line++;
                 self->column = 0;
@@ -201,12 +246,12 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
         break;
     }
 
-    if (*self->cursor == '"')
+    if (peek(self, 0) == '"')
     {
         // String literals.
         self->cursor++;
         const char* start = self->cursor;
-        while (*self->cursor != '"' && !IsEOF(*self->cursor))
+        while (peek(self, 0) != '"' && !IsEOF(peek(self, 0)))
         {
             self->cursor++;
         }
@@ -231,7 +276,7 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
         return t;
     }
 
-    if (*self->cursor == '\'')
+    if (peek(self, 0) == '\'')
     {
         // Char literals.
         self->cursor++;
@@ -273,11 +318,11 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
     }
 
     // Handle alphabets.
-    if (IsAlphabetical(*self->cursor) || *self->cursor == '_')
+    if (IsAlphabetical(peek(self, 0)) || peek(self, 0) == '_')
     {
         // Handle identifiers and keywords.
         const char* start = self->cursor;
-        while (IsAlphaNumerical(*self->cursor) || *self->cursor == '_')
+        while (IsAlphaNumerical(peek(self, 0)) || peek(self, 0) == '_')
         {
             self->cursor++;
         }
@@ -316,14 +361,14 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
     int floatCounter = 0;
     b32 negative = FALSE;
     if (*self->cursor == '-') negative = TRUE;
-    if (IsDigit(*(self->cursor + negative)) || *(self->cursor + negative) == '.')
+    if (IsDigit(peek(self, negative)) || (peek(self, negative) == '.'))
     {
         const char* start = self->cursor;
-        if (*self->cursor == '-') self->cursor++;
+        if (peek(self, 0) == '-') self->cursor++;
 
-        while (IsAlphaNumerical(*self->cursor) || *self->cursor == '.')
+        while (IsAlphaNumerical(peek(self, 0)) || peek(self, 0) == '.')
         {
-            if (*self->cursor == '.') floatCounter++;
+            if (peek(self, 0) == '.') floatCounter++;
             self->cursor++;
         }
         if (floatCounter > 1)
@@ -357,10 +402,10 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
     }
 
     // Handle operators/symbols.
-    if (IsOperatorSymbol(*self->cursor))
+    if (IsOperatorSymbol(peek(self, 0)))
     {
         const char* start = self->cursor;
-        while (IsOperatorSymbol(*self->cursor))
+        while (IsOperatorSymbol(peek(self, 0)))
         {
             self->cursor++;
         }
@@ -397,7 +442,7 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
     // Trivial to parse tokens.
     // TODO: add support for tokens with multiple lengths through
     // peeking.
-    switch (*self->cursor)
+    switch (peek(self, 0))
     {
         case '|': self->cursor++; return CLITERAL(Token) { TOKEN_OP_BW_OR, '|', 1 };
         case '&': self->cursor++; return CLITERAL(Token) { TOKEN_OP_BW_AND, '&', 1 };
@@ -486,14 +531,14 @@ void TokenScanner::backtrack(TokenScanner *self, int by)
     } else self->cursor = self->baseSource;
 }
 
-const char* TokenScanner::peek(TokenScanner *self, int offset)
+char TokenScanner::peek(TokenScanner *self, int offset)
 {
     if (self->cursor + offset >= self->sourceEnd)
     {
-        return "\0";
+        return '\0';
     }
 
-    return self->cursor + offset;
+    return (self->cursor + offset)[0];
 }
 
 

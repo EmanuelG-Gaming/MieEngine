@@ -53,6 +53,9 @@ typedef enum TokenKind {
 
     TOKEN_KW_RETURN,
     TOKEN_KW_IF,
+    TOKEN_KW_ELSE,
+    TOKEN_KW_FOR,
+    TOKEN_KW_WHILE,
 
     TOKEN_KW_GLOBAL,
 
@@ -103,7 +106,7 @@ typedef struct Token {
     int sLen;
 
 
-    Token() : next(NULL) {}
+    Token() : sLen(0), next(NULL) {}
     Token(TokenKind type, char c, int len) : type(type), sLen(len), next(NULL)
     {
         s[0] = c;
@@ -140,7 +143,7 @@ public:
     static void getTokens(TokenScanner* self);
 
     static void backtrack(TokenScanner* self, int by);
-    static const char* peek(TokenScanner* self, int offset);
+    static char peek(TokenScanner* self, int offset);
 
 
     static void print(TokenScanner* self);
@@ -247,6 +250,7 @@ typedef enum AST_types {
     AST_OP_BW_SHL,
     AST_OP_BW_SHR,
 
+
     AST_FUNCTION_RET_TYPE,
     AST_FUNCTION_IDENT,
     AST_FUNCTION_ARG,
@@ -256,8 +260,10 @@ typedef enum AST_types {
     AST_FUNCTION_CALL,
 
     AST_IF_STMT,
+    AST_ELSE,
+    AST_FOR_LOOP,
+    AST_WHILE_LOOP,
     AST_BLOCK,
-
 
     AST_VAR_DECL,
     AST_VAR_DEF,
@@ -351,6 +357,9 @@ public:
     static AST_Node* functionDefinition(Parser* self, AST_Node* parent);
 
     static AST_Node* ifStmt(Parser* self, AST_Node* parent);
+    static AST_Node* forLoop(Parser* self, AST_Node* parent);
+    static AST_Node* whileLoop(Parser* self, AST_Node* parent);
+
     static AST_Node* block(Parser* self, AST_Node* parent);
     static AST_Node* expr(Parser* self, AST_Node* parent);
     static AST_Node* binaryOps(Parser* self, AST_Node* parent, int level);
@@ -451,6 +460,9 @@ private:
 class Compiler {
 public:
     const char* source;
+    const char* sourceEnd;
+    size_t sourceLen;
+
     TokenScanner scanner;
     Parser parser;
     Semantics semantics;
@@ -464,7 +476,7 @@ public:
     Compiler();
     ~Compiler();
 
-    static void init(Compiler* self, const char* sourceCode);
+    static void init(Compiler* self, const char* sourceCode, size_t sourceLen);
 
     static void doLex(Compiler* self);
     static void doParse(Compiler* self);
