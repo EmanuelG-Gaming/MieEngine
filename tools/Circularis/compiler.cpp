@@ -36,8 +36,6 @@ static TokenKind keywordKinds[] = {
 };
 #define SYMBOL_KEYWORD_COUNT STATIC_ARR_LEN(keywordKinds)
 
-
-
 static const char* operatorSymbols[] = {
     "==", ">=", "<=", "!=",
 

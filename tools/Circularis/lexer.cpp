@@ -41,7 +41,7 @@ extern int IsDigit(char ch)
 
 extern int IsOperatorSymbol(char ch)
 {
-    return
+    return // Includes the equals sign (=).
     (ch == '=') || (ch == '!') ||
     (ch == '>') || (ch == '<') ||
     (ch == '&') || (ch == '^') ||
@@ -50,7 +50,15 @@ extern int IsOperatorSymbol(char ch)
     //(ch == '{') || (ch == '}') ||
     //(ch == '[') || (ch == ']');
 }
-
+extern int IsBinaryOpSymbol(char ch)
+{
+    return
+    (ch == '+') || (ch == '-') ||
+    (ch == '*') || (ch == '/') ||
+    (ch == '%') || (ch == '>') ||
+    (ch == '<') || (ch == '&') ||
+    (ch == '|') || (ch == '^');
+}
 
 
 extern int CstrLen(const char *str)
@@ -402,6 +410,38 @@ Token TokenScanner::retrieveNextToken(TokenScanner* self)
     }
 
     // Handle operators/symbols.
+    // We first read if it's a binary operator symbol.
+    if (IsBinaryOpSymbol(peek(self, 0)))
+    {
+        const char* start = self->cursor;
+        while (IsBinaryOpSymbol(peek(self, 0)))
+        {
+            self->cursor++;
+        }
+        size_t length = self->cursor - start;
+        if (length > TOKEN_STR_MAX)
+        {
+            length = TOKEN_STR_MAX;
+        }
+
+        Token t;
+        t.type = TOKEN_EOF;
+        _MEMCPY(t.s, start, length);
+        t.s[length] = '\0';
+        t.sLen = length;
+        t.location.line = self->line;
+        t.location.column = self->column;
+
+        // Check if it's in a keyword table.
+        SymbolTableBucket* bucket = gCompiler->symbols.get(&gCompiler->symbols, t.s);
+        if (bucket != NULL)
+        {
+            // It's an operator.
+            t.type = static_cast <TokenKind> (bucket->symbol.tokenType);
+            return t;
+        }
+    }
+
     if (IsOperatorSymbol(peek(self, 0)))
     {
         const char* start = self->cursor;

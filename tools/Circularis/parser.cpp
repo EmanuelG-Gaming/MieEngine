@@ -470,11 +470,13 @@ AST_Node* Parser::varDef(Parser *self, AST_Node *parent)
     node->C = c;
     node->C->parent = node;
 
+    /*
     if (!consumeOptional(self, ";"))
     {
         PrintError("Syntax error: Expected semicolon ;\n");
         return NULL;
     }
+    */
 
     return node;
 
@@ -569,8 +571,6 @@ AST_Node* Parser::assign(Parser *self, AST_Node *parent)
         return NULL;
     }
     */
-
-    PrintError("Something: %.*s\n", TOKEN_FMT(self->cursor));
 
     AST_Node* c = expr(self, node);
     if (c == NULL)
@@ -907,17 +907,54 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
         currentChild = NULL;
         Token* prevToken = self->cursor;
 
+        // A code block.
+        if (peek(self, "{", 0))
+        {
+            //self->cursor = prevToken;
+            //consumeGo(self);
+
+            currentChild = block(self, node);
+            if (currentChild == NULL)
+            {
+                PrintError("Syntax error: Expected closing '}'.\n");
+                return NULL;
+            }
+            else
+            {
+                if (node->nodes == NULL)
+                {
+                    size_t bytecount = sizeof(AST_Node *) * NODE_CAPACITY;
+                    node->nodes = (AST_Node **) _MALLOC(bytecount);
+                }
+                node->nodes[node->nodeCount] = currentChild;
+                node->nodeCount++;
+            }
+
+            continue;
+        }
+
         if (peek(self, "return", 0))
         {
             // Return statements.
-            self->cursor = prevToken;
+            //self->cursor = prevToken;
             currentChild = returnStmt(self, node);
         }
-        if (peek(self, "if", 0))
+        else if (peek(self, "if", 0))
         {
-            self->cursor = prevToken;
+            //self->cursor = prevToken;
             currentChild = ifStmt(self, node);
         }
+        else if (peek(self, "for", 0))
+        {
+            //self->cursor = prevToken;
+            currentChild = forLoop(self, node);
+        }
+        else if (peek(self, "while", 0))
+        {
+            //self->cursor = prevToken;
+            currentChild = whileLoop(self, node);
+        }
+
 
         if (currentChild == NULL)
         {
@@ -940,7 +977,13 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
         if (currentChild == NULL)
         {
             self->cursor = prevToken;
-            if (peek(self, "=", 1))
+            int hasType = peekType(self, TOKEN_OP_ADD, 1) || peekType(self, TOKEN_OP_SUB, 1)
+                || peekType(self, TOKEN_OP_MUL, 1) || peekType(self, TOKEN_OP_DIV, 1) ||
+                peekType(self, TOKEN_OP_MOD, 1) || peekType(self, TOKEN_OP_BW_AND, 1) ||
+                peekType(self, TOKEN_OP_BW_OR, 1) || peekType(self, TOKEN_OP_BW_XOR, 1) ||
+                peekType(self, TOKEN_OP_BW_SHL, 1) || peekType(self, TOKEN_OP_BW_SHR, 1);
+
+            if (peek(self, "=", 1 + (hasType&1)))
             {
                 // Variable assignments.
                 currentChild = assign(self, node);
@@ -968,8 +1011,17 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
             // Variable definitions.
             self->cursor = prevToken;
             currentChild = varDef(self, node);
-        }
 
+            if (currentChild != NULL)
+            {
+                if (!consumeOptional(self, ";"))
+                {
+                    PrintError("Syntax error: Expected semicolon at the end of variable definition!\n");
+                    return NULL;
+                }
+            }
+
+        }
 
         if (currentChild == NULL)
         {
@@ -986,17 +1038,20 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
         node->nodes[node->nodeCount] = currentChild;
         node->nodeCount++;
     }
+    /*
     if (!peek(self, "}", 0))
     {
         PrintError("Syntax error: Couldn't parse function block. Expected closing curly brace.\n");
         goto err;
     }
+    */
 
     if (!consume(self, "}"))
     {
         PrintError("Syntax error: Expected closing curly brace: '}'\n");
         return NULL;
     }
+
 
     return node;
 
@@ -1136,19 +1191,190 @@ AST_Node* Parser::forLoop(Parser* self, AST_Node* parent)
     node->type = AST_FOR_LOOP;
     node->parent = parent;
 
-    AST_Node* a = expr(self, node);
-    if (a == NULL)
+    // Parse a list of variable decls/defines (defined as a block).
+    AST_Node* a = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
+    assert(a != NULL);
+    a->type = AST_BLOCK;
+    a->parent = node;
+    node->A = a;
+    node->A->parent = node;
+
+    if (!consume(self, "("))
     {
-        // Syntax error: Expected variable initialization.
+        PrintError("Syntax error: Expected opening ( parenthesis in for loop!\n");
         return NULL;
     }
+
+    AST_Node* current = NULL;
+    while (!peek(self, ";", 0))
+    {
+        current = NULL;
+        Token* prevToken = self->cursor;
+        if (peekType(self, TOKEN_KW_INT, 0) || peekType(self, TOKEN_KW_FLOAT, 0) ||
+            peekType(self, TOKEN_KW_STRING, 0))
+        {
+            self->cursor = prevToken;
+            current = varDef(self, a);
+        }
+        else
+        {
+            self->cursor = prevToken;
+            current = assign(self, a);
+        }
+
+        if (current == NULL)
+        {
+            PrintError("Syntax error: Expected a list of variable definitions/assignments in a for loop initializer!\n");
+            break;
+        }
+
+        // Add static vector.
+        if (a->nodes == NULL)
+        {
+            size_t bytecount = sizeof(AST_Node *) * NODE_CAPACITY;
+            a->nodes = (AST_Node **) _MALLOC(bytecount);
+        }
+        a->nodes[a->nodeCount] = current;
+        a->nodeCount++;
+
+        consumeOptional(self, ",");
+    }
+    current = NULL;
+
+    if (!consume(self, ";"))
+    {
+        PrintError("Syntax error: Expected first ; after the list of initializations in the for loop!\n");
+        return NULL;
+    }
+
+    fprintf(stderr, "After token: %.*s\n", TOKEN_FMT(self->cursor));
+
+
+
+    // The conditions.
+    AST_Node* b = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
+    assert(b != NULL);
+    b->type = AST_BLOCK;
+    b->parent = node;
+    node->B = b;
+    node->B->parent = node;
+
+    while (!peek(self, ";", 0))
+    {
+        current = NULL;
+        current = expr(self, b);
+        if (current == NULL)
+        {
+            //PrintError("Syntax error: Expected a list of expressions in a for loop checker!\n");
+            //return NULL;
+            break;
+        }
+
+        // Add static vector.
+        if (b->nodes == NULL)
+        {
+            size_t bytecount = sizeof(AST_Node *) * NODE_CAPACITY;
+            b->nodes = (AST_Node **) _MALLOC(bytecount);
+        }
+        b->nodes[b->nodeCount] = current;
+        b->nodeCount++;
+
+        consumeOptional(self, ",");
+    }
+    current = NULL;
+
+    if (!consume(self, ";"))
+    {
+        PrintError("Syntax error: Expected first ; after the list of initializations in the for loop!\n");
+        return NULL;
+    }
+
+    // The assignments.
+    AST_Node* c = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
+    assert(c != NULL);
+    c->type = AST_BLOCK;
+    c->parent = node;
+    node->C = c;
+    node->C->parent = node;
+
+    while (!peek(self, ")", 0))
+    {
+        current = NULL;
+        current = assign(self, c);
+
+        if (current == NULL)
+        {
+            //PrintError("Syntax error: Expected a list of variable assignments in a for loop!\n");
+            break;
+        }
+
+        // Add static vector.
+        if (c->nodes == NULL)
+        {
+            size_t bytecount = sizeof(AST_Node *) * NODE_CAPACITY;
+            c->nodes = (AST_Node **) _MALLOC(bytecount);
+        }
+        c->nodes[c->nodeCount] = current;
+        c->nodeCount++;
+
+        consumeOptional(self, ",");
+    }
+    current = NULL;
+
+    if (!consume(self, ")"))
+    {
+        PrintError("Syntax error: Expected closing parenthesis ) in for loop!\n");
+        return NULL;
+    }
+
+    // And then we parse the block.
+    AST_Node* d = block(self, node);
+    if (d == NULL)
+    {
+        PrintError("Syntax error: Expected code block in for loop!\n");
+        return NULL;
+    }
+    node->D = d;
+    node->D->parent = d;
 
 
     return node;
 }
 AST_Node* Parser::whileLoop(Parser* self, AST_Node* parent)
 {
-    return NULL;
+    fprintf(stderr, "Token current: %.*s\n", TOKEN_FMT(self->cursor));
+
+    if (!consume(self, "while"))
+    {
+        PrintError("Syntax error: Expected 'while' token.\n");
+        return NULL;
+    }
+
+
+    AST_Node* node = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
+    assert(node != NULL);
+    node->type = AST_WHILE_LOOP;
+    node->parent = parent;
+
+    AST_Node* a = expr(self, node);
+    if (a == NULL)
+    {
+        PrintError("Syntax error: Expected expression.\n");
+        return NULL;
+    }
+    node->A = a;
+    node->A->parent = node;
+
+    AST_Node* b = block(self, node);
+    if (b == NULL)
+    {
+        PrintError("Syntax error: Expected if statement block.\n");
+        return NULL;
+    }
+    node->B = b;
+    node->B->parent = node;
+
+    return node;
 }
 
 // Grammar rule:

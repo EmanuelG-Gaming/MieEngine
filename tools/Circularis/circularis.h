@@ -157,6 +157,7 @@ extern int IsEOF(char ch);
 extern int IsAlphabetical(char ch);
 extern int IsAlphaNumerical(char ch);
 extern int IsOperatorSymbol(char ch);
+extern int IsBinaryOpSymbol(char ch);
 
 extern int CalcPseudoHashBounded(const char* str, int strLen, int arraySize);
 extern int CstrLen(const char* str);
