@@ -48,12 +48,12 @@ int CompilerTest(const char* sourceFileName)
     compiler->init(compiler, static_cast<char *> (dataBuf), size);
     compiler->doLex(compiler);
 
-    compiler->scanner.print(&compiler->scanner);
+    //compiler->scanner.print(&compiler->scanner);
 
     compiler->doParse(compiler);
     compiler->doValidation(compiler);
 
-    compiler->printInfo(compiler);
+    //compiler->printInfo(compiler);
 
     _FREE(compiler);
 

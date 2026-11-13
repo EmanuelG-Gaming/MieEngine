@@ -55,6 +55,19 @@ typedef uint32_t b32;
 #define _FREE(ptr) free(ptr)
 #endif /* _FREE */
 
+#ifdef __cplusplus
+#define DECLTYPE_CAST(T) decltype(T)
+#else
+#define DECLTYPE_CAST(T)
+#endif
+
+
+#ifdef __cplusplus
+#define TYPEOF_CAST(T) typeof(T)
+#else
+#define TYPEOF_CAST(T) __typeof__(T)
+#endif
+
 
 #define SLL_APPEND_FRONT(f, l, n) ((f) == NULL ? \
         (f) = (l) = (n) : \

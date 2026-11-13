@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "base/types.h"
 #include "base/utils.h"
+#include "backends/backend.h"
 
 #include <vector>
 #include <map>
@@ -218,15 +219,14 @@ struct SymbolTable {
     //static b32 has(SymbolTable* self, const char* str, int* hash);
 };
 
-struct FunctionDeclaration {
-    SymbolTable parameters;
-    SymbolTable localVariables;
-    SymbolTable functionCalls;
-};
-
 /*
    Token parser.
 */
+
+typedef enum AST_flags {
+    AST_FLAG_NONE = 0,
+    AST_FLAG_CONST = (1 << 0),
+} AST_flags;
 
 typedef enum AST_types {
     AST_NONE = 0,
@@ -277,8 +277,11 @@ typedef enum AST_types {
 
     AST_EXPR,
 } AST_types;
+#define AST_OP_MIN AST_OP_ADD
+#define AST_OP_MAX AST_OP_BW_SHR
 
 typedef enum AST_valueTypes {
+    AST_VAL_NONE,
     AST_INT,
     AST_FLOAT,
     AST_STRING,
@@ -310,6 +313,8 @@ typedef struct AST_Node {
     // Array of auxiliary nodes.
     AST_Node** nodes;
     int nodeCount;
+
+    uint32_t flags;
 
     AST_Node();
     ~AST_Node();
@@ -384,6 +389,7 @@ public:
     static int name(Parser* self, AST_Node* parent);
 
     static int consume(Parser* self, const char* str);
+    static int consumeType(Parser* self, TokenKind type);
     static int consumeOptional(Parser* self, const char* str);
     static int consumeGo(Parser* self);
 
@@ -398,22 +404,17 @@ public:
 */
 
 typedef struct FunctionArgument {
+    AST_value type;
+    AST_value name;
+
     // Type, name.
+    /*
     const char* type;
     const char* name;
     int typeLen;
     int nameLen;
+    */
 } FunctionArgument;
-
-typedef struct VarSignature {
-    const char* type;
-    const char* name;
-    int typeLen;
-    int nameLen;
-
-    int nestCount;
-} VarSignature;
-
 
 
 typedef struct FunctionSignature {
@@ -426,6 +427,46 @@ typedef struct FunctionSignature {
     FunctionSignature* next;
 } FunctionSignature;
 
+typedef struct VarSignature {
+    const char* type;
+    const char* name;
+    int typeLen;
+    int nameLen;
+
+    AST_valueTypes vt;
+    uint32_t flags;
+
+    int nestCount;
+    VarSignature* next;
+} VarSignature;
+
+typedef struct VarSignatureList {
+    VarSignature *begin, *end;
+} VarSignatureList;
+
+typedef struct VarBlock {
+    VarBlock* parent;
+    std::vector<VarBlock *> children;
+
+    VarSignatureList localVarsTable[128];
+} VarBlock;
+
+typedef struct FunctionDefinition {
+    const char* retType;
+    const char* name;
+    int retLen;
+    int nameLen;
+
+    std::vector<FunctionArgument> args;
+    AST_Node* parent;
+
+    // Will have some nesting.
+    VarBlock body;
+
+    FunctionDefinition* next;
+} FunctionDefinition;
+
+
 class Semantics {
 public:
     // Usually the root node.
@@ -433,21 +474,58 @@ public:
 
     struct FunctionSignatureList {
         FunctionSignature *begin, *end;
-    } functionDecl[128], functionDef[128];
+        //AST_Node* node;
+    } functionDecl[128], functionCalls[128];
+
+    struct FunctionDefinitionList {
+        FunctionDefinition *begin, *end;
+    } functionDef[128];
+
+    VarSignatureList globalVarDecl[128], globalVarDef[128];
+
 
     Semantics();
     ~Semantics();
 
     static void init(Semantics* self, AST_Node* parent);
-    static void visitFunctions(Semantics* self, AST_Node* parent);
 
+    // Visiting.
+    static void visitGlobalVars(Semantics* self, AST_Node* parent);
+
+    static void visitFunctions(Semantics* self, AST_Node* parent);
+    static void visitFunctionsForBlock(Semantics* self, AST_Node* parent);
+    static void visitBlock(Semantics* self, AST_Node* parent, VarBlock* block);
+
+    static void visitFunctionCalls(Semantics* self, AST_Node* parent);
+    static void visitBlockFnCall(Semantics* self, AST_Node* parent);
+    static void visitExprs(Semantics* self, AST_Node* parent);
+
+    // Checking.
+    static int checkGlobalVars(Semantics* self);
     static int checkFnSignatures(Semantics* self);
+
+    // Evaluation.
+    static AST_value evaluateExpr(Semantics* self, AST_Node* node);
+    static int doConstFold(Semantics* self, AST_Node** np,
+        VarSignatureList* constArrLocal, VarSignatureList* constArrGlobal);
+
 
     static int validate(Semantics* self);
 
+    // Local variable utilities.
+    static void printBlock(Semantics* self, VarBlock* block);
+    static void terminateBlock(Semantics* self, VarBlock* block);
+
+
+    // Not that used nowadays.
+    static int addToVarSignature(Semantics* self, VarSignatureList* arr, VarSignature var);
+    static VarSignature* findVarSignature(Semantics* self, VarSignatureList* arr, VarSignature* var);
+    static VarSignature* findNextDuplicateVarSignature(Semantics* self, VarSignatureList* arr,
+        VarSignature* src);
+
     static int addToFunctionSignature(Semantics* self, FunctionSignatureList* arr, FunctionSignature fn);
     static FunctionSignature* findFunctionSignature(Semantics* self, FunctionSignatureList* arr, FunctionSignature* src);
-    static FunctionSignature* findNextDuplicate(Semantics* self, FunctionSignatureList* arr,
+    static FunctionSignature* findNextDuplicateFnSignature(Semantics* self, FunctionSignatureList* arr,
         FunctionSignature* src);
 
 private:
@@ -487,6 +565,7 @@ public:
 };
 
 extern Compiler* gCompiler;
+extern CompilerBackend* gBackend;
 
 
 #endif /* CIRCULARIS_H_ */

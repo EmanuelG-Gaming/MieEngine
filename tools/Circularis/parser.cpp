@@ -277,6 +277,12 @@ AST_Node* Parser::globalDecl(Parser *self, AST_Node *parent)
 {
     consumeOptional(self, "global");
 
+    if (consumeOptional(self, "const"))
+    {
+        PrintError("Syntax error: Cannot declare a constant variable without a value!\n");
+        return NULL;
+    }
+
     AST_Node* node = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
     assert(node != NULL);
     node->type = AST_GLOBAL_DECL;
@@ -324,6 +330,11 @@ AST_Node* Parser::globalDef(Parser *self, AST_Node *parent)
     assert(node != NULL);
     node->type = AST_GLOBAL_DEF;
     node->parent = parent;
+
+    if (consumeOptional(self, "const"))
+    {
+        node->flags |= AST_FLAG_CONST;
+    }
 
     AST_Node* a = type(self, node, FALSE);
     if (a == NULL)
@@ -382,6 +393,12 @@ AST_Node* Parser::varDecl(Parser *self, AST_Node *parent)
         return NULL;
     }
 
+    if (consumeOptional(self, "const"))
+    {
+        PrintError("Syntax error: Cannot declare a constant local variable without a value!\n");
+        return NULL;
+    }
+
     AST_Node* node = (AST_Node *) _CALLOC(1, sizeof(AST_Node));
     assert(node != NULL);
     node->type = AST_VAR_DECL;
@@ -432,6 +449,11 @@ AST_Node* Parser::varDef(Parser *self, AST_Node *parent)
     assert(node != NULL);
     node->type = AST_VAR_DEF;
     node->parent = parent;
+
+    if (consumeOptional(self, "const"))
+    {
+        node->flags |= AST_FLAG_CONST;
+    }
 
     AST_Node* a = type(self, node, FALSE);
     if (a == NULL)
@@ -588,7 +610,7 @@ AST_Node* Parser::assign(Parser *self, AST_Node *parent)
 // returnStmt -> "return" expr ";"
 AST_Node* Parser::returnStmt(Parser *self, AST_Node *parent)
 {
-    if (!consume(self, "return"))
+    if (!consumeType(self, TOKEN_KW_RETURN))
     {
         PrintError("Syntax error: expected 'return'\n");
         return NULL;
@@ -933,23 +955,24 @@ AST_Node* Parser::block(Parser* self, AST_Node *parent)
             continue;
         }
 
-        if (peek(self, "return", 0))
+        // Symbolic keywords.
+        if (peekType(self, TOKEN_KW_RETURN, 0))
         {
             // Return statements.
             //self->cursor = prevToken;
             currentChild = returnStmt(self, node);
         }
-        else if (peek(self, "if", 0))
+        else if (peekType(self, TOKEN_KW_IF, 0))
         {
             //self->cursor = prevToken;
             currentChild = ifStmt(self, node);
         }
-        else if (peek(self, "for", 0))
+        else if (peekType(self, TOKEN_KW_FOR, 0))
         {
             //self->cursor = prevToken;
             currentChild = forLoop(self, node);
         }
-        else if (peek(self, "while", 0))
+        else if (peekType(self, TOKEN_KW_WHILE, 0))
         {
             //self->cursor = prevToken;
             currentChild = whileLoop(self, node);
@@ -1081,7 +1104,7 @@ err:
 // optional: else.
 AST_Node* Parser::ifStmt(Parser *self, AST_Node *parent)
 {
-    if (!consume(self, "if"))
+    if (!consumeType(self, TOKEN_KW_IF))
     {
         PrintError("Syntax error: Expected 'if' token.\n");
         return NULL;
@@ -1180,7 +1203,7 @@ AST_Node* Parser::ifStmt(Parser *self, AST_Node *parent)
 // forLoop -> "for" ("(")* (varDef|varAssign) ";" expr ";" expr ("{")* block  ("}")*
 AST_Node* Parser::forLoop(Parser* self, AST_Node* parent)
 {
-    if (!consume(self, "for"))
+    if (!consumeType(self, TOKEN_KW_FOR))
     {
         // Syntax error: Expected keyword "for" in for loop.
         return NULL;
@@ -1342,9 +1365,7 @@ AST_Node* Parser::forLoop(Parser* self, AST_Node* parent)
 }
 AST_Node* Parser::whileLoop(Parser* self, AST_Node* parent)
 {
-    fprintf(stderr, "Token current: %.*s\n", TOKEN_FMT(self->cursor));
-
-    if (!consume(self, "while"))
+    if (!consumeType(self, TOKEN_KW_WHILE))
     {
         PrintError("Syntax error: Expected 'while' token.\n");
         return NULL;
@@ -1368,7 +1389,7 @@ AST_Node* Parser::whileLoop(Parser* self, AST_Node* parent)
     AST_Node* b = block(self, node);
     if (b == NULL)
     {
-        PrintError("Syntax error: Expected if statement block.\n");
+        PrintError("Syntax error: Expected while loop block.\n");
         return NULL;
     }
     node->B = b;
@@ -1881,6 +1902,19 @@ int Parser::consume(Parser *self, const char *str)
 
     return FALSE;
 }
+
+int Parser::consumeType(Parser *self, TokenKind type)
+{
+    if (self->cursor->type == type)
+    {
+        self->cursor = self->cursor + 1;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+
 
 int Parser::consumeOptional(Parser *self, const char *str)
 {
